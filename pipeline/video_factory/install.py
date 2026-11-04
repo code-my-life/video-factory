@@ -12,11 +12,13 @@ import http.client
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
 import urllib.request
+import zipfile
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
@@ -73,8 +75,41 @@ def strip_filter(strip: int) -> Callable[[tarfile.TarInfo, str], tarfile.TarInfo
     return keep
 
 
+def zip_member_path(name: str, strip: int) -> PurePosixPath | None:
+    """Where a zip member goes once its first `strip` components are removed; None for what is left out. A name that
+    is absolute or climbs out of the destination is refused."""
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts or "\\" in name:
+        raise InstallError(f"membre de zip refusé : {name}")
+    parts = path.parts[strip:]
+    return PurePosixPath(*parts) if parts else None
+
+
+def extract_zip(archive: Path, destination: Path, strip: int) -> None:
+    """A zip (Chrome for Testing ships its builds so): regular files only, each with its Unix mode, no link."""
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            for member in bundle.infolist():
+                mode = member.external_attr >> 16
+                if stat.S_ISLNK(mode):
+                    raise InstallError(f"{archive.name} : lien symbolique refusé ({member.filename})")
+                relative = zip_member_path(member.filename, strip)
+                if relative is None or member.is_dir():
+                    continue
+                target = destination / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with bundle.open(member) as source, target.open("wb") as out:
+                    shutil.copyfileobj(source, out)
+                target.chmod(0o755 if mode & 0o111 else 0o644)
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise InstallError(f"{archive.name} : archive refusée ({exc})") from exc
+
+
 def extract(archive: Path, destination: Path, strip: int) -> None:
     destination.mkdir(parents=True, exist_ok=True)
+    if zipfile.is_zipfile(archive):
+        extract_zip(archive, destination, strip)
+        return
     try:
         with tarfile.open(archive) as tar:
             tar.extractall(destination, filter=strip_filter(strip))
