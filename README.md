@@ -13,6 +13,12 @@ Ce dépôt est public et ne contient que le moteur : le code de la commande `vf`
 
 Chaque étape inscrit dans l'état de la vidéo (`state.json`) l'empreinte de ses entrées et de ses sorties, la version de ses outils et ses paramètres. Ce socle ([#2](https://github.com/code-my-life/video-factory/issues/2)) livre `vf doctor` et `vf new` ; les étapes arrivent avec [#4](https://github.com/code-my-life/video-factory/issues/4).
 
+## Les guides
+
+- [Les comptes de la marque](docs/comptes.md) : TikTok, YouTube et Instagram, à créer une fois.
+- [Le tournage](docs/tournage.md) : les réglages de l'iPhone, le cadrage et les règles d'anonymat.
+- [La publication à la main](docs/publication.md) : les champs de chaque plateforme, le crédit du robot et la conformité.
+
 ## Démarrer
 
 Prérequis : Linux ou WSL 2, [uv](https://docs.astral.sh/uv/), git, Docker Desktop (intégration WSL) et un compilateur C et C++ (gcc, g++).
