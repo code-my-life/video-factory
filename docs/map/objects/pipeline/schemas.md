@@ -12,7 +12,7 @@ hits:
 
 # schemas
 
-Validates a document against a JSON Schema (Draft 2020-12) with `jsonschema`, and returns every violation as a sorted list of "where : what" lines.
+Validates a document against a JSON Schema (Draft 2020-12) with `jsonschema`, and returns every violation as a sorted list of "where : what" lines; `duration_bounds` reads the bounds of `duree_visee` from the script schema, the one place they are written, for `qc`.
 
 ## Why this shape
 

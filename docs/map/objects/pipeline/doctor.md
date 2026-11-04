@@ -17,7 +17,7 @@ hits:
 
 ## Why this shape
 
-One check per kind of lock entry (archive, file, source build, npm, Docker image), each returning problems instead of raising, so the report lists every gap at once and the exit code is 1 when there is one. Commands run through a runner, so tests answer them without processes. A source build cannot be pinned by the hash of its binary (it depends on the compiler), so its stamp records the verified source and the options, and the binary hash only guards against a change after the build.
+One check per kind of lock entry (archive, file, source build, npm, pulled Docker image, built Docker image), each returning problems instead of raising, so the report lists every gap at once and the exit code is 1 when there is one. A built image passes when its build folder has the lock's fingerprint and the image carries the pinned digest (manifest or config, depending on Docker's image store). After `--install` of named tools, the report covers those tools only. Commands run through a runner, so tests answer them without processes. A source build cannot be pinned by the hash of its binary (it depends on the compiler), so its stamp records the verified source and the options, and the binary hash only guards against a change after the build.
 
 ## If you change this
 
