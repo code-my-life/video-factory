@@ -16,7 +16,7 @@ from video_factory import lock as lockfile
 from video_factory.hashing import sha256_file
 
 # The Python packages a step's results depend on, recorded with their versions next to the external tools.
-PYTHON_PACKAGES = ("ai-edge-litert", "numpy")
+PYTHON_PACKAGES = ("numpy",)
 
 
 class ToolError(Exception):

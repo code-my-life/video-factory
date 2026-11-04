@@ -42,7 +42,7 @@ jobs:
         run: uv run ruff check
       - name: Format (ruff)
         run: uv run ruff format --check
-      # The tests that run FFmpeg and the MediaPipe models use the pinned ones, installed and verified by vf itself.
+      # The tests that run FFmpeg use the pinned one, installed and verified by vf itself.
       # whisper.cpp, its model and the HyperFrames render image are left to the machine (see the RUNBOOK).
       - name: Outils figés des tests, en cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -50,7 +50,7 @@ jobs:
           path: ~/.local/share/video-factory/tools
           key: vf-tools-${{ hashFiles('toolchain/tools.lock.json') }}
       - name: Installer les outils figés des tests
-        run: uv run vf doctor --install ffmpeg mediapipe-face-detector mediapipe-selfie-segmenter
+        run: uv run vf doctor --install ffmpeg
       - name: Tests (pytest)
         env:
           # A test that needs one of these tools fails instead of being skipped.

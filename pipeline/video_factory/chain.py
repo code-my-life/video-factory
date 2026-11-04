@@ -57,28 +57,10 @@ STEPS = (
         "ingest",
         (),
         ("ffmpeg",),
-        modules("ingest", "media", "routes"),
+        modules("ingest", "media"),
         steps.ingest_inputs,
         steps.ingest_params,
         steps.ingest_run,
-    ),
-    Step(
-        "scan",
-        ("ingest",),
-        ("ffmpeg", "mediapipe-face-detector"),
-        modules("scan", "faces", "media"),
-        steps.work_input,
-        steps.scan_params,
-        steps.scan_run,
-    ),
-    Step(
-        "blur",
-        ("ingest",),
-        ("ffmpeg", "mediapipe-selfie-segmenter"),
-        modules("blur", "media"),
-        steps.work_input,
-        steps.blur_params,
-        steps.blur_run,
     ),
     Step(
         "transcribe",
@@ -98,7 +80,7 @@ STEPS = (
         steps.align_params,
         steps.align_run,
     ),
-    Step("cut", ("align", "scan"), (), modules("cut"), steps.cut_inputs, steps.cut_params, steps.cut_run),
+    Step("cut", ("align",), (), modules("cut"), steps.cut_inputs, steps.cut_params, steps.cut_run),
     Step(
         "voice",
         ("ingest", "cut"),
@@ -110,7 +92,7 @@ STEPS = (
     ),
     Step(
         "compose",
-        ("blur", "cut"),
+        ("ingest", "cut"),
         ("ffmpeg", "hyperframes-render", *LIBRARIES),
         modules("compose", "music", "script", "cut", "media", "tools") + TEMPLATE,
         steps.compose_inputs,
@@ -129,8 +111,8 @@ STEPS = (
     Step(
         "qc",
         ("master", "compose"),
-        ("ffmpeg", "mediapipe-face-detector"),
-        modules("qc", "faces", "compose", "media"),
+        ("ffmpeg",),
+        modules("qc", "compose", "media"),
         steps.qc_inputs,
         steps.qc_params,
         steps.qc_run,
@@ -258,15 +240,12 @@ def run(video: Video, again: Sequence[str] = (), say: Callable[[str], None] = pr
     return done
 
 
-def register_takes(video: Video, files: Sequence[Path], route: str | None) -> None:
+def register_takes(video: Video, files: Sequence[Path]) -> None:
     """Store the takes as shot (copies, the originals stay where they are) and make them the video's takes."""
     for file in files:
         if not file.is_file():
             raise StepError(f"{file} introuvable")
     video.state["takes"] = [store.put(video.media, file, extension(file), keep_source=True) for file in files]
-    if route is not None:
-        video.state["route"] = route
-    video.route()
     video.save()
 
 

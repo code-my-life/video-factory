@@ -44,7 +44,6 @@ def parser() -> argparse.ArgumentParser:
     )
     take.add_argument("id", help="identifiant de la vidéo")
     take.add_argument("files", nargs="*", type=Path, metavar="fichier", help="les prises, dans l'ordre")
-    take.add_argument("--voie", help="voie de tournage de mask/routes.json (par défaut, celle du fichier)")
     take.add_argument(
         "--capture",
         nargs=2,
@@ -130,7 +129,7 @@ def run_ingest(args: argparse.Namespace, home: Path) -> int:
         stored = chain.register_capture(video, name.strip(), Path(file))
         print(f"capture « {name.strip()} » : {stored['kind']}, {stored['file']}")
     if args.files:
-        chain.register_takes(video, args.files, args.voie)
+        chain.register_takes(video, args.files)
         for take in video.state["takes"]:
             print(f"prise : {take['file']}")
         chain.run_step(video, chain.BY_NAME["ingest"], say)

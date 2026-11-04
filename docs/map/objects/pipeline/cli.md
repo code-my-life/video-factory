@@ -15,7 +15,7 @@ hits:
 
 # cli
 
-The `vf` command: it parses `vf doctor [--install [TOOL ...]]`, `vf new <id>`, `vf ingest <id> [takes] [--voie] [--capture NAME FILE]`, `vf status <id>` and `vf run <id> [--refaire STEP ...]`, hands the environment and the home directory to the modules, and turns their results into French messages and exit codes (`vf run` exits 1 when a step fails or `qc` refuses the master).
+The `vf` command: it parses `vf doctor [--install [TOOL ...]]`, `vf new <id>`, `vf ingest <id> [takes] [--capture NAME FILE]`, `vf status <id>` and `vf run <id> [--refaire STEP ...]`, hands the environment and the home directory to the modules, and turns their results into French messages and exit codes (`vf run` exits 1 when a step fails or `qc` refuses the master).
 
 ## Why this shape
 

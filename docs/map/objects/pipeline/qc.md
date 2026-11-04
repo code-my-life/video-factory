@@ -12,7 +12,7 @@ hits:
 
 # qc
 
-`qc`: measures (ffprobe, EBU R 128, the face detector on every master frame, compose's text boxes and plan) then pure rules: duration within the script schema's bounds (61 to 65 s), -14 LUFS within 1 LU, true peak at -1 dBTP or below, H.264 High at each platform size, 30 fps constant, BT.709, AAC 48 kHz, text in the strictest safe zone, face camera at half the duration at most, no face; each failure names its bound.
+`qc`: measures (ffprobe, EBU R 128, compose's text boxes and plan) then pure rules: duration within the script schema's bounds (61 to 65 s), -14 LUFS within 1 LU, true peak at -1 dBTP or below, H.264 High at each platform size, 30 fps constant, BT.709, AAC 48 kHz, text in the strictest safe zone, face camera at half the duration at most; each failure names its bound.
 
 ## Why this shape
 
@@ -25,4 +25,4 @@ Facts and rules are apart, so each rule is tested on facts alone and the measure
 
 ## See
 
-- [`judge`](../../../../pipeline/video_factory/qc.py), [`check_text`](../../../../pipeline/video_factory/qc.py), [`check_faces`](../../../../pipeline/video_factory/qc.py), [`stream_facts`](../../../../pipeline/video_factory/qc.py)
+- [`judge`](../../../../pipeline/video_factory/qc.py), [`check_text`](../../../../pipeline/video_factory/qc.py), [`stream_facts`](../../../../pipeline/video_factory/qc.py)

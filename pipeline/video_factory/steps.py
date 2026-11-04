@@ -1,4 +1,4 @@
-"""The ten steps of the chain, each as three functions: its inputs (name → fingerprint), its parameters, and its run.
+"""The eight steps of the chain, each as three functions: its inputs (name → fingerprint), its parameters, and its run.
 
 A run works in a scratch folder of the media store and returns the files it made (stored by the chain under their
 fingerprints) and a summary of what it measured. Every external program is a pinned tool of the lock.
@@ -13,18 +13,14 @@ from pathlib import Path
 
 from video_factory import (
     align,
-    blur,
     captures,
     compose,
     cut,
-    faces,
     ingest,
     master,
     media,
     music,
     qc,
-    routes,
-    scan,
     script,
     transcribe,
     voice,
@@ -57,67 +53,27 @@ def parsed_script(video: Video) -> script.Script:
 def ingest_inputs(video: Video) -> dict[str, str]:
     if not video.state["takes"]:
         raise StepError(f"aucune prise : vf ingest {video.id} <fichiers>")
-    _name, route = video.route()
-    found = {f"take-{index}": take["sha256"] for index, take in enumerate(video.state["takes"], 1)}
-    return found | {"route": routes.fingerprint(route)}
+    return {f"take-{index}": take["sha256"] for index, take in enumerate(video.state["takes"], 1)}
 
 
-def ingest_params(video: Video) -> dict:
-    name, _route = video.route()
-    return {"route": name, "fps": media.FPS, "sample_rate": media.SAMPLE_RATE, "crf": ingest.CRF}
+def ingest_params(_video: Video) -> dict:
+    return {"fps": media.FPS, "sample_rate": media.SAMPLE_RATE, "crf": ingest.CRF}
 
 
 def ingest_run(video: Video, scratch: Path) -> Result:
-    _name, route = video.route()
     tools = video.toolbox
     takes = [video.media / take["file"] for take in video.state["takes"]]
     work = scratch / "work.mkv"
     try:
-        described = ingest.make_working_copy(tools.ffmpeg, tools.ffprobe, takes, route, work)
+        described = ingest.make_working_copy(tools.ffmpeg, tools.ffprobe, takes, work)
     except ingest.IngestError as exc:
         raise StepError(str(exc)) from exc
     report = write_json(scratch / "probe.json", described)
     return Result({"work": (work, "mkv"), "probe": (report, "json")}, {"duration": described["work"]["duration"]})
 
 
-# --- scan -----------------------------------------------------------------------------------------------------------
-
-
 def work_input(video: Video) -> dict[str, str]:
     return {"work": video.output_ref("ingest", "work")["sha256"]}
-
-
-def scan_params(_video: Video) -> dict:
-    return {"threshold": faces.THRESHOLD, "margin": scan.MARGIN, "size": [faces.WIDTH, faces.HEIGHT]}
-
-
-def scan_run(video: Video, scratch: Path) -> Result:
-    detector = faces.Detector(video.toolbox.model("mediapipe-face-detector"))
-    scores = scan.frame_scores(video.toolbox.ffmpeg, video.output("ingest", "work"), detector)
-    report = scan.report(scores)
-    summary = {"frames": report["frames"], "faces": len(report["faces"]), "ranges": len(report["ranges"])}
-    return Result({"faces": (write_json(scratch / "faces.json", report), "json")}, summary)
-
-
-# --- blur -----------------------------------------------------------------------------------------------------------
-
-
-def blur_params(_video: Video) -> dict:
-    return {"sigma": blur.SIGMA, "mask": blur.MASK_SIZE, "qp": blur.QP, "sample_every": blur.SAMPLE_EVERY}
-
-
-def blur_run(video: Video, scratch: Path) -> Result:
-    tools = video.toolbox
-    work = video.output("ingest", "work")
-    size = media.summary(media.probe(tools.ffprobe, work))
-    mask, output = scratch / "mask.mkv", scratch / "blur.mkv"
-    segmenter = blur.Segmenter(tools.model("mediapipe-selfie-segmenter"))
-    count = blur.write_masks(tools.ffmpeg, work, segmenter, mask)
-    command = blur.composite_command(work, mask, size["width"], size["height"], output)
-    media.ffmpeg(tools.ffmpeg, command, "blur")
-    drops = blur.measure(tools.ffmpeg, work, output, mask, size["width"], size["height"])
-    summary = {"frames": count, "sharpness_drop": drops}
-    return Result({"video": (output, "mkv"), "mask": (mask, "mkv")}, summary)
 
 
 # --- transcribe -----------------------------------------------------------------------------------------------------
@@ -187,7 +143,6 @@ def align_run(video: Video, scratch: Path) -> Result:
 def cut_inputs(video: Video) -> dict[str, str]:
     return {
         "alignment": video.output_ref("align", "alignment")["sha256"],
-        "faces": video.output_ref("scan", "faces")["sha256"],
     }
 
 
@@ -197,10 +152,9 @@ def cut_params(_video: Video) -> dict:
 
 def cut_run(video: Video, scratch: Path) -> Result:
     words = video.output_json("align", "alignment")["words"]
-    ranges = video.output_json("scan", "faces")["ranges"]
     duration = video.record("ingest")["summary"]["duration"]
     try:
-        edl = cut.decide(words, ranges, duration)
+        edl = cut.decide(words, duration)
     except cut.CutError as exc:
         raise StepError(str(exc)) from exc
     off_script = [word["text"] for word in edl["words"] if word["label"] == align.OFF_SCRIPT]
@@ -252,7 +206,7 @@ def used_captures(video: Video) -> list[str]:
 
 def compose_inputs(video: Video) -> dict[str, str]:
     found = {
-        "camera": video.output_ref("blur", "video")["sha256"],
+        "camera": video.output_ref("ingest", "work")["sha256"],
         "edl": video.output_ref("cut", "edl")["sha256"],
         "script": video.script_sha256(),
     }
@@ -306,7 +260,7 @@ def compose_run(video: Video, scratch: Path) -> Result:
     except (compose.ComposeError, ToolError) as exc:
         raise StepError(str(exc)) from exc
     camera = project / "assets" / "camera.mp4"
-    compose.camera_track(tools.ffmpeg, tools.ffprobe, video.output("blur", "video"), edl, camera)
+    compose.camera_track(tools.ffmpeg, tools.ffprobe, video.output("ingest", "work"), edl, camera)
     files = {name: video.media / registered[name]["file"] for name in used_captures(video)}
     compose.place_captures(tools.ffmpeg, project, plan, files)
     outside = compose.outside_references(project) + [f"absent : {name}" for name in compose.missing_files(project)]
@@ -406,7 +360,6 @@ def qc_params(_video: Video) -> dict:
         "true_peak_max": qc.PEAK_MAX,
         "safe": compose.SAFE,
         "camera_share_max": qc.CAMERA_SHARE_MAX,
-        "face_threshold": faces.THRESHOLD,
     }
 
 
@@ -415,7 +368,6 @@ def qc_facts(video: Video) -> dict:
     master_file, tiktok_file = video.output("master", "master"), video.output("master", "tiktok")
     plan = video.output_json("compose", "plan")
     loudness, peak = qc.loudness(tools.ffmpeg, master_file)
-    detector = faces.Detector(tools.model("mediapipe-face-detector"))
     master_facts = qc.stream_facts(tools.ffprobe, master_file)
     return {
         "duration": master_facts["duration"],
@@ -426,14 +378,12 @@ def qc_facts(video: Video) -> dict:
         "text": video.output_json("compose", "text")["runs"],
         "camera_frames": plan["camera_frames"],
         "frames": plan["frames"],
-        "faces": qc.detected_faces(tools.ffmpeg, master_file, detector),
     }
 
 
 def qc_run(video: Video, scratch: Path) -> Result:
     facts = qc_facts(video)
     document = qc.report(qc.judge(facts))
-    document["faces"] = facts["faces"]
     summary = {
         "passed": document["passed"],
         "failed": [check["message"] for check in document["checks"] if not check["ok"]],

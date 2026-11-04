@@ -37,7 +37,7 @@ def test_the_script_and_the_state_share_the_same_id_rule():
 
 def test_a_state_of_another_schema_version_or_with_a_short_fingerprint_is_refused():
     state = {
-        "schema_version": 2,
+        "schema_version": 3,
         "id": "essai",
         "created_at": "2026-11-04T14:00:00Z",
         "script": {"path": "script.md", "sha256": "ab" * 32},
@@ -46,7 +46,9 @@ def test_a_state_of_another_schema_version_or_with_a_short_fingerprint_is_refuse
         "steps": {},
     }
     assert schemas.problems(state, STATE_SCHEMA) == []
-    assert schemas.problems(state | {"schema_version": 1}, STATE_SCHEMA) != []
-    assert schemas.problems(state | {"schema_version": 3}, STATE_SCHEMA) != []
+    assert schemas.problems(state | {"schema_version": 2}, STATE_SCHEMA) != []
+    assert schemas.problems(state | {"schema_version": 4}, STATE_SCHEMA) != []
+    assert schemas.problems(state | {"route": "quicklook-screen"}, STATE_SCHEMA) != []
+    assert schemas.problems(state | {"steps": {"scan": {}}}, STATE_SCHEMA) != []
     assert schemas.problems(state | {"script": {"path": "script.md", "sha256": "ab"}}, STATE_SCHEMA) != []
     assert schemas.problems(state | {"created_at": "2026-11-04 14:00"}, STATE_SCHEMA) != []

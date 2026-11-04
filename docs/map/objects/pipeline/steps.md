@@ -11,7 +11,7 @@ hits:
 
 # steps
 
-The ten steps as inputs (name to fingerprint), parameters and run, each run working in a store scratch folder and returning its files and a summary; plus the cleaning of captures.
+The eight steps as inputs (name to fingerprint), parameters and run, each run working in a store scratch folder and returning its files and a summary; plus the cleaning of captures.
 
 ## Why this shape
 

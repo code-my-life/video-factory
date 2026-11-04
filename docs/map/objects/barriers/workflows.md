@@ -13,7 +13,7 @@ hits:
 
 # workflows
 
-The GitHub barriers: `ci.yml` runs "Aucun contenu" and "Lint et tests (Python 3.12)" on every push of any branch and on each pull request (the second installs the pinned FFmpeg and MediaPipe models, cached by the lock's hash, and requires them); `conventions.yml` calls the shared Conventions check of code-my-life/.github; `CODEOWNERS` makes the owner's approval required.
+The GitHub barriers: `ci.yml` runs "Aucun contenu" and "Lint et tests (Python 3.12)" on every push of any branch and on each pull request (the second installs the pinned FFmpeg, cached by the lock's hash, and requires them); `conventions.yml` calls the shared Conventions check of code-my-life/.github; `CODEOWNERS` makes the owner's approval required.
 
 ## Why this shape
 

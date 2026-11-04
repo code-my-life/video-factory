@@ -1,6 +1,6 @@
 """`compose`: the video as a HyperFrames project, checked by `hyperframes check`, rendered frame by frame offline.
 
-The plan comes first, in Python: the face-camera track (the blurred take, cut by the decision list), the
+The plan comes first, in Python: the face-camera track (the take as delivered, cut by the decision list), the
 full-frame shots the script notes (« stat », « etapes », « code », and « capture » for a registered still or clip of a
 real screen), the word captions and their groups in output time, and the punch-ins. A shot noted at the end of a
 sentence covers it; one inside a sentence starts on the word before it; either way it lasts until the next sentence
@@ -501,17 +501,17 @@ def encode_args(output: Path) -> list[str | Path]:
     ]
 
 
-def camera_track(ffmpeg: Path, ffprobe: Path, blurred: Path, edl: dict, output: Path) -> None:
+def camera_track(ffmpeg: Path, ffprobe: Path, take: Path, edl: dict, output: Path) -> None:
     """The face-camera track: for each output frame, the source frame the decision list puts on screen."""
     wanted = cut.source_frames(edl)
-    summary = media.summary(media.probe(ffprobe, blurred))
+    summary = media.summary(media.probe(ffprobe, take))
     width, height = summary["width"], summary["height"]
     size = f"{width}x{height}"
     # Raw YUV both ways: the pixels are copied, never converted to RGB and back.
     input_args = ["-f", "rawvideo", "-pix_fmt", "yuv420p", "-s", size, "-r", str(FPS), *BT709_INPUT]
     position = 0
     with media.RawWriter(ffmpeg, input_args, encode_args(output), "compose, piste caméra") as out:
-        frames = media.frames(ffmpeg, blurred, width, height, "null", pix_fmt="yuv420p")
+        frames = media.frames(ffmpeg, take, width, height, "null", pix_fmt="yuv420p")
         current, index = None, -1
         for target in wanted:
             while index < target:

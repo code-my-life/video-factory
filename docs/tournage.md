@@ -18,7 +18,7 @@ Une prise est un enregistrement de l'écran de l'iPhone 16 Pro pendant qu'AR Qui
 5. Dis tout le script, phrase par phrase.
 6. Arrête l'enregistrement par la pastille rouge en haut de l'écran.
 
-Le haut et le bas de l'écran (la pastille, les boutons de Quick Look) sont retirés par `vf ingest`, qui recadre la prise en 9:16. L'image de l'enregistrement est en miroir : `vf ingest` la remet à l'endroit.
+La chaîne prend la prise telle que livrée : elle ne la recadre pas, ne la retourne pas et ne floute pas le fond. Avant de la verser, recadre-la en 9:16 (retire la pastille et les boutons de Quick Look, et remets l'image à l'endroit si elle est en miroir) : `vf ingest` refuse une prise qui n'est pas en 9:16, en donnant ses dimensions.
 
 ## Le cadrage
 
@@ -28,13 +28,13 @@ Le haut et le bas de l'écran (la pastille, les boutons de Quick Look) sont reti
 
 ## Les règles d'anonymat, et leur raison
 
-- **Rien de reconnaissable derrière toi.** Le fond est flouté par la chaîne, mais un flou n'efface pas toujours un objet, une affiche ou une fenêtre.
+- **Rien de reconnaissable derrière toi.** La chaîne ne floute pas le fond : un objet, une affiche ou une fenêtre restent visibles.
 - **Aucun reflet** : ni lunettes, ni vitre, ni écran derrière toi. Un reflet peut montrer ton visage hors du casque.
 - **Les mains sous le menton.** Une main passée devant le visage fait disparaître le casque (test du 4 novembre 2026) : le visage paraît.
 - **Pas de rotation brusque de la tête.** Le suivi décroche, et le casque se décale ou disparaît.
 - **Aucun nom, aucune adresse, aucun écran personnel** dans le champ.
 
-La chaîne coupe toute image où son détecteur trouve un visage, mais ces règles évitent d'en perdre au montage.
+La chaîne ne cherche pas de visage : relis la prise avant de la verser, et coupe toute image où le visage paraît.
 
 ## Une phrase ratée
 

@@ -12,7 +12,7 @@ hits:
 
 # cut
 
-`cut`: the edit decision list on the 48 kHz sample grid: kept and off-script words from the first kept word to the last, pauses over 400 ms brought to 150 ms, fillers and retakes removed whole, `scan` ranges removed; each said word with its output time; `source_frames` maps each output frame to the source frame on screen.
+`cut`: the edit decision list on the 48 kHz sample grid: kept and off-script words from the first kept word to the last, pauses over 400 ms brought to 150 ms, fillers and retakes removed whole; each said word with its output time; `source_frames` maps each output frame to the source frame on screen.
 
 ## Why this shape
 
@@ -21,7 +21,7 @@ Cutting on the sample grid lets a pause be exactly 150 ms while the video follow
 ## If you change this
 
 - **Hits:** [voice](voice.md) and [compose](compose.md), which apply the list; the C3 guarantee; `tests/test_cut.py`.
-- **Does not hit:** the alignment ([align](align.md)) or the face ranges ([scan](scan.md)) it reads.
+- **Does not hit:** the alignment ([align](align.md)) it reads.
 
 ## See
 
