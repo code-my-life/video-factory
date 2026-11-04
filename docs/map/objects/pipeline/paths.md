@@ -12,7 +12,7 @@ hits:
 
 # paths
 
-Where `vf` finds its own resources (lock, schemas, template, read from the checkout) and the three outside places: the content clone (`VF_CONTENT`), the media store (`VF_MEDIA`) and the tools (`VF_TOOLS`).
+Where `vf` finds its own resources (lock, schemas, script template, routes file, composition template, read from the checkout) and the three outside places: the content clone (`VF_CONTENT`), the media store (`VF_MEDIA`) and the tools (`VF_TOOLS`).
 
 ## Why this shape
 

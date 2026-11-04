@@ -21,8 +21,8 @@ The SHA-256 of the HyperFrames tarball pins one package, not its dependencies; `
 
 ## If you change this
 
-- **Hits:** the `hyperframes` entry of the [tools lock](tools-lock.md) (version, URL, `sha256`, `tree_sha256`), in the same pull request; installed copies, which doctor reports as "installé depuis un autre package-lock.json"; `tests/test_lock.py`.
-- **Does not hit:** the Docker render image, whose own npm install is not pinned by this file (see `not_pinned_yet` in the tools lock).
+- **Hits:** the `hyperframes` entry of the [tools lock](tools-lock.md) (version, URL, `sha256`, `tree_sha256`), in the same pull request; installed copies, which doctor reports as "installé depuis un autre package-lock.json"; the [render image](render-image.md), built from this same folder (its `context_sha256` and digests change too); `tests/test_lock.py`.
+- **Does not hit:** the Python dependencies (`uv.lock`).
 
 ## See
 

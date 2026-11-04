@@ -1,13 +1,15 @@
 [project]
 name = "video-factory"
-version = "0.1.0"
-description = "Monteur vidéo de Code My Life : la commande vf (outils figés, nouvelles vidéos)."
+version = "0.2.0"
+description = "Monteur vidéo de Code My Life : la commande vf, de la prise au master."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "ai-edge-litert==2.3.0",
     "jsonschema==4.26.0",
+    "numpy==2.5.4",
 ]
 
 [project.scripts]
@@ -39,3 +41,4 @@ select = ["E", "W", "F", "I", "N", "B", "C4", "UP", "SIM", "PIE", "PTH", "RET", 
 testpaths = ["tests"]
 pythonpath = ["scripts"]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = ["acceptance(name): an acceptance test of an issue, carrying the exact name the issue gives it"]

@@ -197,6 +197,44 @@ def check_docker_image(tool: lockfile.Tool, run: Runner) -> list[Problem]:
     return []
 
 
+def image_id_problem(tool: lockfile.Tool, run: Runner, accepted: set[str]) -> Problem | None:
+    """The image tagged as the lock says is present and is one of the accepted ids."""
+    name, fix, image = str(tool["name"]), str(tool["install"]), str(tool["image"])
+    done = run(["docker", "image", "inspect", "--format", "{{.Id}}", image], None)
+    if done.returncode == 127:
+        return Problem(name, "docker introuvable", f"installer Docker Desktop (intégration WSL), puis {fix}")
+    if done.returncode != 0:
+        if "no such image" in done.output.lower():
+            return Problem(name, f"image {image} absente", fix)
+        gap = f"Docker ne répond pas : {first_line(done.output)}"
+        return Problem(name, gap, f"démarrer Docker Desktop, puis {fix}")
+    if done.output.strip() not in accepted:
+        return Problem(name, f"{image} n'est pas l'image figée {short(str(tool['sha256']))}", fix)
+    return None
+
+
+def built_image_ids(tool: lockfile.Tool) -> set[str]:
+    """The ids a built image may carry: its manifest digest (containerd image store) or its config digest."""
+    return {f"sha256:{tool['sha256']}", f"sha256:{tool['config_sha256']}"}
+
+
+def check_docker_build(tool: lockfile.Tool, run: Runner, repo_root: Path) -> list[Problem]:
+    """A locally built image: its build folder is the one the lock pins, and the image is the pinned one."""
+    context = repo_root / str(tool["context"])
+    found = tree_sha256(context) if context.is_dir() else "absent"
+    if found != tool["context_sha256"]:
+        return [
+            Problem(
+                str(tool["name"]),
+                f"{tool['context']} ne correspond pas au lock (empreinte {short(found)} au lieu de "
+                f"{short(str(tool['context_sha256']))})",
+                "reconstruire l'image et reporter context_sha256, sha256 et config_sha256 dans le lock (RUNBOOK)",
+            )
+        ]
+    problem = image_id_problem(tool, run, built_image_ids(tool))
+    return [problem] if problem else []
+
+
 def check_tool(
     tool: lockfile.Tool,
     lock: Mapping[str, object],
@@ -217,6 +255,8 @@ def check_tool(
         return check_source_build(tool, home, env, run)
     if kind == "npm":
         return check_npm(tool, home, env, run, repo_root, user_home)
+    if kind == "docker-build":
+        return check_docker_build(tool, run, repo_root)
     return check_docker_image(tool, run)
 
 
@@ -248,13 +288,17 @@ def diagnose(
     base_env: Mapping[str, str],
     repo_root: Path,
     user_home: Path,
+    only: list[str] | None = None,
 ) -> list[tuple[str, list[Problem]]]:
-    """(label, problems) for each tool of the lock, then for each outside place."""
+    """(label, problems) for each tool of the lock, then for each outside place; with only, for those tools alone (what
+    `vf doctor --install <tool> …` installed, as on a CI runner that needs a few tools and no content clone)."""
     results = []
     for tool in lock["tools"]:
+        if only is not None and tool["name"] not in only:
+            continue
         label = f"{tool['name']} {tool['version']}"
         results.append((label, check_tool(tool, lock, places, run, base_env, repo_root, user_home)))
-    return results + check_places(places)
+    return results if only is not None else results + check_places(places)
 
 
 def report(results: list[tuple[str, list[Problem]]], lock_path: Path, tools_root: Path) -> tuple[str, int]:

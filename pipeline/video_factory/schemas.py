@@ -26,6 +26,14 @@ def problems(instance: object, schema_path: Path) -> list[str]:
 
 
 @cache
+def duration_bounds(schema_path: Path) -> tuple[int, int]:
+    """The bounds of a video's duration in seconds, as the script schema publishes them for « duree_visee »: the one
+    place they are written, read by qc for the master."""
+    field = json.loads(schema_path.read_text(encoding="utf-8"))["properties"]["duree_visee"]
+    return field["minimum"], field["maximum"]
+
+
+@cache
 def def_validator(schema_path: Path, name: str) -> Draft202012Validator:
     """A validator for one entry of the schema's $defs, with the other definitions still reachable."""
     schema = json.loads(schema_path.read_text(encoding="utf-8"))

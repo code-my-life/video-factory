@@ -13,7 +13,7 @@ hits:
 
 # install
 
-`vf doctor --install`: downloads each tool of the lock, verifies its SHA-256 before any use, then extracts, builds or installs it into `VF_TOOLS/<tool>/<version>/` in one rename.
+`vf doctor --install`: downloads each tool of the lock, verifies its SHA-256 before any use, then extracts, builds or installs it into `VF_TOOLS/<tool>/<version>/` in one rename; builds the render image with `docker buildx` (OCI archive, clamped timestamps, no attestation) and refuses it unless its digest is the pinned one.
 
 ## Why this shape
 

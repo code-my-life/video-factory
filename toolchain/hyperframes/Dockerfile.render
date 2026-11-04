@@ -1,0 +1,96 @@
+# The HyperFrames render image of video-factory: every layer pinned, built on the machine by
+# `uv run vf doctor --install hyperframes-render`, which passes every build argument from toolchain/tools.lock.json.
+#
+# HyperFrames publishes no render image: its CLI builds one from the Dockerfile.render of its npm package, with
+# unpinned Debian packages, the "stable" chrome-headless-shell of the day and `npm install -g hyperframes`. This file
+# keeps its shape and pins each part instead:
+# - the base image by its index digest (the hyperframes-render-base entry of the lock);
+# - the Debian packages from snapshot.debian.org at a fixed date, the one the base image itself was built from;
+# - chrome-headless-shell at the exact version HyperFrames 0.9.12 manages (Chrome for Testing), checked by SHA-256;
+# - FFmpeg and ffprobe from the static build HyperFrames 0.9.12 pins in its own Dockerfile, checked by SHA-256;
+# - HyperFrames and its whole npm tree from toolchain/hyperframes/package-lock.json (npm ci, no install scripts);
+# - the fonts: the composition brings its own (an @font-face file); DejaVu, from the snapshot, is the only fallback.
+# Logs, caches and timestamps are removed or clamped (SOURCE_DATE_EPOCH, rewrite-timestamp), so a rebuild gives the
+# same image digest. vf starts the container itself, with --network none and telemetry, update checks and installs
+# turned off; nothing in the image reaches the network at render time.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ARG DEBIAN_SNAPSHOT
+ARG CHROME_VERSION
+ARG CHROME_SHA256
+ARG FFMPEG_URL
+ARG FFMPEG_SHA256
+ARG SOURCE_DATE_EPOCH
+
+SHELL ["/bin/sh", "-eu", "-c"]
+
+# Debian packages: the libraries chrome-headless-shell links against (its deb.deps, reduced to what ldd asks for),
+# fontconfig and one fallback font, and the tools this build uses to fetch and unpack.
+RUN test -n "${DEBIAN_SNAPSHOT}" \
+    && printf '%s\n' \
+      "Types: deb" \
+      "URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
+      "Suites: bookworm bookworm-updates" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      "" \
+      "Types: deb" \
+      "URIs: http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}" \
+      "Suites: bookworm-security" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      > /etc/apt/sources.list.d/debian.sources \
+    && printf '%s\n' 'Acquire::Retries "8";' 'Acquire::http::Timeout "120";' > /etc/apt/apt.conf.d/80-vf-retries \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      ca-certificates curl unzip xz-utils \
+      libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 \
+      libnspr4 libnss3 libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2 \
+      fontconfig fonts-dejavu-core \
+    && dpkg-query -W -f '${Package}=${Version}\n' | sort > /usr/share/vf-packages.txt \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/* /var/cache/debconf/*-old /var/lib/dpkg/*-old \
+      /var/cache/ldconfig/aux-cache /var/cache/fontconfig/* /etc/apt/apt.conf.d/80-vf-retries
+
+# chrome-headless-shell: BeginFrame capture, the deterministic path of HyperFrames.
+RUN test -n "${CHROME_VERSION}" && test -n "${CHROME_SHA256}" \
+    && curl -fsSL -o /tmp/chrome.zip \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-headless-shell-linux64.zip" \
+    && echo "${CHROME_SHA256}  /tmp/chrome.zip" | sha256sum -c - \
+    && unzip -q /tmp/chrome.zip -d /opt \
+    && mv /opt/chrome-headless-shell-linux64 /opt/chrome-headless-shell \
+    && rm /tmp/chrome.zip \
+    && missing="$(ldd /opt/chrome-headless-shell/chrome-headless-shell | grep 'not found' || true)" \
+    && test -z "${missing}" || { echo "${missing}" >&2; exit 1; }
+
+# FFmpeg and ffprobe, which HyperFrames calls to read the footage of a composition.
+RUN test -n "${FFMPEG_URL}" && test -n "${FFMPEG_SHA256}" \
+    && curl -fsSL -o /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" \
+    && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
+    && tar -xJf /tmp/ffmpeg.tar.xz -C /usr/local/bin --strip-components=2 --wildcards '*/bin/ffmpeg' '*/bin/ffprobe' \
+    && rm /tmp/ffmpeg.tar.xz
+
+# The render environment, set before HyperFrames runs for the first time below.
+ENV CONTAINER=true \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/opt/chrome-headless-shell/chrome-headless-shell \
+    PRODUCER_HEADLESS_SHELL_PATH=/opt/chrome-headless-shell/chrome-headless-shell \
+    HYPERFRAMES_NO_TELEMETRY=1 \
+    DO_NOT_TRACK=1 \
+    HYPERFRAMES_NO_UPDATE_CHECK=1 \
+    HYPERFRAMES_NO_AUTO_INSTALL=1 \
+    HYPERFRAMES_SKIP_SKILLS=1 \
+    HYPERFRAMES_NO_OPTIONAL_INSTALL=1
+
+# HyperFrames, its npm tree pinned by the same lockfile as the host install.
+COPY package.json package-lock.json /opt/hyperframes/
+RUN cd /opt/hyperframes \
+    && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error \
+    && ln -s /opt/hyperframes/node_modules/.bin/hyperframes /usr/local/bin/hyperframes \
+    && hyperframes --version \
+    && rm -rf /root/.npm /root/.hyperframes /root/.cache /tmp/*
+
+WORKDIR /project
+ENTRYPOINT ["hyperframes", "render"]

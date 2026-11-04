@@ -1,4 +1,4 @@
-"""`vf new <id>`: a new video in the content clone, its script from the template and its state at schema version 1.
+"""`vf new <id>`: a new video in the content clone, its script from the template and its state at schema version 2.
 
 The files are built by pure functions, checked against the published schemas, and written only when both are valid;
 an existing id is refused, so a video is never overwritten.
@@ -14,8 +14,8 @@ from pathlib import Path
 from video_factory import frontmatter, schemas
 from video_factory.hashing import sha256_bytes
 from video_factory.paths import SCRIPT_SCHEMA, STATE_SCHEMA
+from video_factory.state import VERSION as STATE_VERSION
 
-STATE_VERSION = 1
 ID_FIELD = "{{id}}"
 SCRIPT_NAME = "script.md"
 STATE_NAME = "state.json"
@@ -34,12 +34,14 @@ def script_text(template: str, video_id: str) -> str:
 
 
 def new_state(video_id: str, script_sha256: str, created_at: str) -> dict:
-    """The state of a video nothing has been done to yet: its script's fingerprint and no step."""
+    """The state of a video nothing has been done to yet: its script's fingerprint, no take, no capture, no step."""
     return {
         "schema_version": STATE_VERSION,
         "id": video_id,
         "created_at": created_at,
         "script": {"path": SCRIPT_NAME, "sha256": script_sha256},
+        "takes": [],
+        "captures": {},
         "steps": {},
     }
 

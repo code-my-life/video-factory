@@ -1,0 +1,148 @@
+"""`ingest`: the working copy of a video, made from its takes and its shooting route.
+
+For each take, in order: the route's 9:16 crop (the phone's interface removed), the mirror undone, 30 frames per second
+at a constant rate, the colours brought to BT.709 SDR, the sound at 48 kHz mono. Several takes are joined end to end.
+The working copy carries no metadata of the phone (no place, no device, no date): only the video and audio streams are
+mapped, metadata and chapters are dropped, and the muxer and encoders write no version string.
+
+Colour, read from each take: BT.709 passes through; another gamut (Display P3 for a screen recording) is converted;
+HLG (the iPhone camera's default) and PQ are tone mapped to SDR by a fixed curve (Hable, nominal peak 100 nits), so the
+same take always gives the same pixels.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from video_factory import media
+
+CRF = 12
+PRESET = "veryfast"
+# ffprobe's names of the transfers that need a tone map, and of the tags that mean "already BT.709 SDR".
+HDR_TRANSFERS = frozenset({"arib-std-b67", "smpte2084"})
+SDR_709 = {"color_primaries": "bt709", "color_transfer": "bt709", "color_space": "bt709"}
+KNOWN = {
+    "color_primaries": frozenset({"bt709", "bt2020", "smpte432", "smpte431", "smpte170m", "bt470bg"}),
+    "color_transfer": frozenset({"bt709", "arib-std-b67", "smpte2084", "iec61966-2-1", "smpte170m", "bt2020-10"}),
+    "color_space": frozenset({"bt709", "bt2020nc", "smpte170m", "bt470bg"}),
+}
+TONE_MAP = "tonemap=tonemap=hable:desat=0"
+
+
+class IngestError(Exception):
+    """A take does not fit the route, or has no sound."""
+
+
+def display_size(summary: dict) -> tuple[int, int]:
+    """Width and height as shown, the display rotation applied (FFmpeg rotates while decoding)."""
+    if summary["rotation"] in (90, 270):
+        return summary["height"], summary["width"]
+    return summary["width"], summary["height"]
+
+
+def colour_tags(summary: dict) -> dict[str, str]:
+    """The take's colour tags, unknown or missing ones read as BT.709 (what an untagged phone video is)."""
+    return {key: summary[key] if summary[key] in KNOWN[key] else SDR_709[key] for key in SDR_709}
+
+
+def colour_filter(summary: dict) -> str:
+    """The filters that bring a take's colours to BT.709 SDR in limited range."""
+    tags = colour_tags(summary)
+    if tags == SDR_709:
+        return "null"
+    source = f"pin={tags['color_primaries']}:tin={tags['color_transfer']}:min={tags['color_space']}:rin=tv"
+    if tags["color_transfer"] in HDR_TRANSFERS:
+        return (
+            f"zscale={source}:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,{TONE_MAP},zscale=t=bt709:m=bt709:r=tv"
+        )
+    return f"zscale={source}:p=bt709:t=bt709:m=bt709:r=tv"
+
+
+def take_filters(index: int, summary: dict, route: dict) -> str:
+    """The video and audio filter chains of one take, labelled [v<index>] and [a<index>]."""
+    crop = route["crop"]
+    video = [
+        "fps=30",
+        f"crop={crop['width']}:{crop['height']}:{crop['x']}:{crop['y']}",
+        *(["hflip"] if route["mirrored"] else []),
+        colour_filter(summary),
+        "format=yuv420p",
+        media.BT709,
+        "setsar=1",
+    ]
+    duration = summary["duration"]
+    audio = [
+        "aresample=48000:async=1:first_pts=0",
+        "aformat=sample_fmts=s32:channel_layouts=mono",
+        f"apad=whole_dur={duration}",
+        f"atrim=end={duration}",
+    ]
+    return f"[{index}:v:0]{','.join(video)}[v{index}];[{index}:a:0]{','.join(audio)}[a{index}]"
+
+
+def check_take(name: str, summary: dict, route: dict) -> None:
+    width, height = display_size(summary)
+    expected = route["source"]
+    if (width, height) != (expected["width"], expected["height"]):
+        raise IngestError(
+            f"{name} : {width}x{height} au lieu de {expected['width']}x{expected['height']}, la taille de la voie"
+        )
+    if summary["audio"] is None:
+        raise IngestError(f"{name} : aucune piste son, la voix manque")
+
+
+def command(takes: list[Path], summaries: list[dict], route: dict, output: Path) -> list[str | Path]:
+    """The ffmpeg arguments that make the working copy (Matroska: H.264 and 24-bit PCM)."""
+    inputs: list[str | Path] = []
+    for take in takes:
+        inputs += ["-i", take]
+    graph = ";".join(take_filters(index, summary, route) for index, summary in enumerate(summaries))
+    pairs = "".join(f"[v{index}][a{index}]" for index in range(len(takes)))
+    graph += f";{pairs}concat=n={len(takes)}:v=1:a=1[v][a]"
+    return [
+        *inputs,
+        "-filter_complex",
+        graph,
+        "-map",
+        "[v]",
+        "-map",
+        "[a]",
+        *media.NO_METADATA,
+        *media.BITEXACT,
+        "-c:v",
+        "libx264",
+        "-preset",
+        PRESET,
+        "-crf",
+        str(CRF),
+        "-threads",
+        str(media.THREADS),
+        "-pix_fmt",
+        "yuv420p",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-colorspace",
+        "bt709",
+        "-color_range",
+        "tv",
+        "-c:a",
+        "pcm_s24le",
+        "-ar",
+        str(media.SAMPLE_RATE),
+        "-ac",
+        "1",
+        "-f",
+        "matroska",
+        output,
+    ]
+
+
+def make_working_copy(ffmpeg: Path, ffprobe: Path, takes: list[Path], route: dict, output: Path) -> dict:
+    """Write the working copy of takes to output; return what was read of each take and of the result."""
+    summaries = [media.summary(media.probe(ffprobe, take)) for take in takes]
+    for number, summary in enumerate(summaries, 1):
+        check_take(f"prise {number}", summary, route)
+    media.ffmpeg(ffmpeg, command(takes, summaries, route, output), "ingest")
+    return {"takes": summaries, "work": media.summary(media.probe(ffprobe, output))}

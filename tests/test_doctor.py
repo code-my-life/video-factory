@@ -258,3 +258,57 @@ def test_image_repository_drops_the_tag_but_keeps_the_registry():
 def test_run_command_reports_a_missing_program_without_raising(tmp_path):
     done = doctor.run_command([str(tmp_path / "absent")])
     assert done.returncode == 127
+
+
+@pytest.fixture
+def built(tmp_path: Path):
+    """A docker-build entry whose build folder is in place."""
+    repo = tmp_path / "repo"
+    context = repo / "toolchain" / "render"
+    context.mkdir(parents=True)
+    (context / "Dockerfile.render").write_text("FROM scratch\n")
+    tool = {
+        "name": "render",
+        "kind": "docker-build",
+        "version": "1",
+        "install": "uv run vf doctor --install render",
+        "sha256": "aa" * 32,
+        "config_sha256": "bb" * 32,
+        "image": "vf-render:1",
+        "context": "toolchain/render",
+        "context_sha256": tree_sha256(context),
+    }
+    return tool, repo
+
+
+def test_a_built_image_with_the_pinned_id_passes(built):
+    tool, repo = built
+    for found in ("aa" * 32, "bb" * 32):
+        assert (
+            doctor.check_docker_build(tool, answers({"docker": doctor.Completed(0, f"sha256:{found}\n")}), repo) == []
+        )
+
+
+def test_a_built_image_with_another_id_or_absent_is_a_gap(built):
+    tool, repo = built
+    other = doctor.check_docker_build(tool, answers({"docker": doctor.Completed(0, "sha256:" + "cc" * 32)}), repo)
+    assert other[0].gap.startswith("vf-render:1 n'est pas l'image figée")
+    absent = doctor.check_docker_build(tool, answers({"docker": doctor.Completed(1, "Error: No such image")}), repo)
+    assert absent[0].gap == "image vf-render:1 absente"
+    assert absent[0].fix == "uv run vf doctor --install render"
+
+
+def test_a_changed_build_folder_is_a_gap_that_asks_for_a_new_lock_entry(built):
+    tool, repo = built
+    (repo / "toolchain" / "render" / "Dockerfile.render").write_text("FROM scratch\nRUN true\n")
+    found = doctor.check_docker_build(tool, answers({"docker": doctor.Completed(0, f"sha256:{'aa' * 32}")}), repo)
+    assert "ne correspond pas au lock" in found[0].gap
+    assert "reporter context_sha256" in found[0].fix
+
+
+def test_after_installing_named_tools_only_those_are_reported(setup):
+    run = answers(setup["outputs"])
+    results = doctor.diagnose(
+        setup["lock"], setup["places"], run, {"PATH": "/usr/bin"}, setup["repo"], setup["home"], only=["model"]
+    )
+    assert [label for label, _problems in results] == ["model rev1"]

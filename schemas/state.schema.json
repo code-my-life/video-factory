@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/schemas/state.schema.json",
-  "title": "État d'une vidéo, version 1",
-  "description": "video-content/videos/<id>/state.json : l'empreinte du script, puis, pour chaque étape passée, l'empreinte de ses entrées et de ses sorties, la version de ses outils et ses paramètres. Écrit par vf et vérifié à chaque écriture.",
+  "title": "État d'une vidéo, version 2",
+  "description": "video-content/videos/<id>/state.json : l'empreinte du script, les prises et les captures versées par vf ingest, puis, pour chaque étape passée, l'empreinte de ses entrées et de ses sorties, la version de ses outils, ses paramètres et l'empreinte de son code. Écrit par vf et vérifié à chaque écriture. La version 1 (sans prise ni étape) se lit et se réécrit en version 2.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "id", "created_at", "script", "steps"],
+  "required": ["schema_version", "id", "created_at", "script", "takes", "captures", "steps"],
   "properties": {
     "schema_version": {
-      "description": "Version de ce schéma. Un changement incompatible crée la version 2.",
-      "const": 1
+      "description": "Version de ce schéma. Un changement incompatible crée la version suivante.",
+      "const": 2
     },
     "id": {
       "description": "Identifiant de la vidéo, égal au nom de son dossier.",
@@ -20,7 +20,7 @@
       "$ref": "#/$defs/utc_timestamp"
     },
     "script": {
-      "description": "Le script de la vidéo, à côté de state.json.",
+      "description": "Le script de la vidéo, à côté de state.json, et son empreinte à la création.",
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],
@@ -29,8 +29,24 @@
         "sha256": { "$ref": "#/$defs/sha256" }
       }
     },
+    "route": {
+      "description": "La voie de tournage des prises, une clé de mask/routes.json.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "takes": {
+      "description": "Les prises, dans l'ordre où elles se suivent, telles que tournées, dans le magasin des médias.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/media" }
+    },
+    "captures": {
+      "description": "Les captures d'écran ou courts extraits muets que le script appelle par [capture: <nom>], nettoyés de leurs métadonnées.",
+      "type": "object",
+      "propertyNames": { "minLength": 1, "maxLength": 120 },
+      "additionalProperties": { "$ref": "#/$defs/capture" }
+    },
     "steps": {
-      "description": "Les étapes passées, par nom, dans l'ordre de la chaîne.",
+      "description": "Les étapes passées, par nom.",
       "type": "object",
       "propertyNames": {
         "enum": ["ingest", "scan", "blur", "transcribe", "align", "cut", "voice", "compose", "master", "qc"]
@@ -52,11 +68,32 @@
       "type": "string",
       "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
     },
+    "media": {
+      "description": "Un fichier du magasin des médias : son empreinte, et son nom, « <empreinte>.<extension> ».",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "file"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "file": { "type": "string", "pattern": "^[0-9a-f]{64}\\.[a-z0-9]+$" }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "file", "kind", "source_sha256"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "file": { "type": "string", "pattern": "^[0-9a-f]{64}\\.(?:png|mp4)$" },
+        "kind": { "enum": ["image", "video"] },
+        "source_sha256": { "description": "L'empreinte du fichier versé, avant nettoyage.", "$ref": "#/$defs/sha256" }
+      }
+    },
     "step": {
       "description": "Ce qu'une étape inscrit en se terminant.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["inputs", "outputs", "tools", "params", "finished_at"],
+      "required": ["inputs", "outputs", "tools", "params", "code", "started_at", "finished_at", "seconds"],
       "properties": {
         "inputs": {
           "description": "Empreinte SHA-256 de chaque entrée, par nom.",
@@ -64,12 +101,12 @@
           "additionalProperties": { "$ref": "#/$defs/sha256" }
         },
         "outputs": {
-          "description": "Empreinte SHA-256 de chaque sortie, par nom.",
+          "description": "Chaque sortie, par nom, rangée dans le magasin des médias.",
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/sha256" }
+          "additionalProperties": { "$ref": "#/$defs/media" }
         },
         "tools": {
-          "description": "Version de chaque outil appelé, par nom d'outil de toolchain/tools.lock.json.",
+          "description": "Version de chaque outil appelé : les entrées de toolchain/tools.lock.json par nom, video-factory, et les paquets Python (« python:<paquet> »).",
           "type": "object",
           "additionalProperties": { "type": "string", "minLength": 1 }
         },
@@ -77,7 +114,17 @@
           "description": "Les paramètres de l'étape.",
           "type": "object"
         },
-        "finished_at": { "$ref": "#/$defs/utc_timestamp" }
+        "code": {
+          "description": "Empreinte des sources de video-factory qui font le résultat de l'étape.",
+          "$ref": "#/$defs/sha256"
+        },
+        "summary": {
+          "description": "Ce que l'étape a relevé (mesures, nombres, rapport de qc).",
+          "type": "object"
+        },
+        "started_at": { "$ref": "#/$defs/utc_timestamp" },
+        "finished_at": { "$ref": "#/$defs/utc_timestamp" },
+        "seconds": { "description": "Durée de l'étape.", "type": "number", "minimum": 0 }
       }
     }
   }

@@ -204,12 +204,54 @@ def install_docker_image(tool: lockfile.Tool) -> None:
     run_step(["docker", "tag", pinned, image], os.environ, Path.cwd(), "docker tag")
 
 
+def build_command(tool: lockfile.Tool, repo_root: Path, archive: Path) -> list[str]:
+    """docker buildx build with the pinned arguments, exported as an OCI archive with clamped timestamps and without
+    attestations, so the same build folder gives the same image digest."""
+    args = [item for key, value in dict(tool["build_args"]).items() for item in ("--build-arg", f"{key}={value}")]
+    return [
+        "docker",
+        "buildx",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "--provenance=false",
+        "--sbom=false",
+        *args,
+        "--output",
+        f"type=oci,dest={archive},name={tool['image']},rewrite-timestamp=true",
+        "-f",
+        str(repo_root / str(tool["dockerfile"])),
+        str(repo_root / str(tool["context"])),
+    ]
+
+
+def install_docker_build(tool: lockfile.Tool, repo_root: Path, scratch: Path) -> None:
+    """Build the image from the pinned folder, load it, and refuse it unless its digest is the pinned one."""
+    context = repo_root / str(tool["context"])
+    found = tree_sha256(context)
+    if found != tool["context_sha256"]:
+        pinned = tool["context_sha256"]
+        raise InstallError(f"{tool['name']} : {tool['context']} d'empreinte {found} au lieu de {pinned}")
+    archive = scratch / "image.oci.tar"
+    run_step(build_command(tool, repo_root, archive), os.environ, scratch, "docker buildx build")
+    run_step(["docker", "load", "-i", str(archive)], os.environ, scratch, "docker load")
+    done = doctor.run_command(["docker", "image", "inspect", "--format", "{{.Id}}", str(tool["image"])])
+    if done.output.strip() not in doctor.built_image_ids(tool):
+        raise InstallError(
+            f"{tool['name']} : image construite d'identifiant {done.output.strip()} au lieu de sha256:{tool['sha256']}"
+        )
+
+
 def install_tool(
     tool: lockfile.Tool, lock: Mapping[str, object], places: Places, repo_root: Path, opener: Opener = open_url
 ) -> None:
     kind = tool["kind"]
     if kind == "docker-image":
         install_docker_image(tool)
+        return
+    if kind == "docker-build":
+        with workspace(places.tools, str(tool["name"])) as scratch:
+            install_docker_build(tool, repo_root, scratch)
         return
     final = lockfile.tool_dir(places.tools, tool)
     try:

@@ -8,6 +8,7 @@ import json
 import pytest
 
 from video_factory import lock
+from video_factory.hashing import tree_sha256
 from video_factory.paths import LOCK_FILE, REPO_ROOT
 
 PINNED = lock.load(LOCK_FILE)
@@ -22,7 +23,7 @@ def test_each_tool_has_its_url_its_sha256_and_the_command_that_installs_it():
     for name, tool in TOOLS.items():
         assert tool["install"] == f"uv run vf doctor --install {name}"
         assert len(tool["sha256"]) == 64
-        if tool["kind"] != "docker-image":
+        if tool["kind"] not in ("docker-image", "docker-build"):
             assert tool["url"].startswith("https://")
 
 
@@ -93,3 +94,22 @@ def test_requirements_come_first_in_lock_order():
         "node",
         "hyperframes",
     ]
+
+
+def test_the_render_image_is_built_from_the_pinned_folder_on_the_pinned_base():
+    tool = TOOLS["hyperframes-render"]
+    assert tool["kind"] == "docker-build"
+    assert tool["context_sha256"] == tree_sha256(REPO_ROOT / tool["context"])
+    base = TOOLS["hyperframes-render-base"]
+    assert tool["build_args"]["BASE_IMAGE"] == f"{base['image']}@sha256:{base['sha256']}"
+    assert tool["requires"] == ["hyperframes-render-base"]
+    dockerfile = (REPO_ROOT / tool["dockerfile"]).read_text(encoding="utf-8")
+    for name in tool["build_args"]:
+        assert f"ARG {name}\n" in dockerfile, f"{name} has no default in the Dockerfile: the lock gives it"
+    assert "hyperframes@" not in dockerfile  # HyperFrames comes from the npm lockfile, never from a tag
+
+
+def test_the_render_image_runs_the_chrome_hyperframes_manages():
+    tool = TOOLS["hyperframes-render"]
+    assert tool["build_args"]["CHROME_VERSION"] == "152.0.7977.30"
+    assert tool["version"].startswith(TOOLS["hyperframes"]["version"])

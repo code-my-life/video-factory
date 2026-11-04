@@ -11,7 +11,7 @@ hits:
 
 # script template
 
-`templates/script.md`: the script `vf new` copies, its front matter with the video id filled in and an HTML comment that recalls the annotations (`[stat: …]`, `[etapes: …]`, `[code: …]`, `[zoom]`).
+`templates/script.md`: the script `vf new` copies, its front matter with the video id filled in (and `duree_visee: 63`) and an HTML comment that recalls the annotations (`[stat: …]`, `[etapes: …]`, `[code: …]`, `[zoom]`); `[capture: <name>]` and the `|` separator are documented in the RUNBOOK and parsed by [script](../pipeline/script.md).
 
 ## Why this shape
 
@@ -20,7 +20,7 @@ The template is the only place a new script comes from, so every script starts v
 ## If you change this
 
 - **Hits:** every video created afterwards (not the existing ones); `tests/test_new.py`, which checks the fields `vf new` writes.
-- **Does not hit:** the HyperFrames composition templates, which come with the design system and will live elsewhere in `templates/`.
+- **Does not hit:** the HyperFrames [composition template](composition-template.md) of `compose`.
 
 ## See
 

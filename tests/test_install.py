@@ -192,3 +192,18 @@ def test_swap_in_replaces_a_previous_version_in_one_rename(tmp_path):
     install.swap_in(staged, final)
     assert sorted(path.name for path in final.iterdir()) == ["new"]
     assert not (tmp_path / "tool" / "1.old").exists()
+
+
+def test_the_render_image_is_built_reproducibly_with_the_pinned_arguments():
+    from video_factory import lock as lockfile
+    from video_factory.paths import LOCK_FILE, REPO_ROOT
+
+    tool = lockfile.by_name(lockfile.load(LOCK_FILE))["hyperframes-render"]
+    command = install.build_command(tool, REPO_ROOT, Path("/scratch/image.oci.tar"))
+    assert command[:3] == ["docker", "buildx", "build"]
+    assert "--provenance=false" in command and "--sbom=false" in command
+    output = command[command.index("--output") + 1]
+    assert output == "type=oci,dest=/scratch/image.oci.tar,name=vf-hyperframes-render:0.9.12-1,rewrite-timestamp=true"
+    for key, value in tool["build_args"].items():
+        assert f"{key}={value}" in command
+    assert command[-1] == str(REPO_ROOT / "toolchain" / "hyperframes")

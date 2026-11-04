@@ -13,7 +13,7 @@ hits:
 
 # videos
 
-`vf new <id>`: builds `script.md` from the template and `state.json` at schema version 1, validates both against the published schemas, and writes them into `VF_CONTENT/videos/<id>/`, refusing an id that exists.
+`vf new <id>`: builds `script.md` from the template and `state.json` at schema version 2 (no take, no capture, no step), validates both against the published schemas, and writes them into `VF_CONTENT/videos/<id>/`, refusing an id that exists.
 
 ## Why this shape
 
