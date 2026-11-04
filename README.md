@@ -9,7 +9,9 @@ Ce dépôt est public et ne contient que le moteur : le code de la commande `vf`
 1. Un script approuvé, dans `video-content`.
 2. Le tournage à l'iPhone, le masque du robot appliqué.
 3. `vf ingest` (la prise livrée propre et cadrée en 9:16, gardée telle quelle), puis `transcribe`, `align`, `cut`, `voice`, `compose` (un vrai projet HyperFrames, vérifié par `hyperframes check`, rendu sans réseau), `master` et `qc`.
-4. La publication.
+4. La publication, à la main pour l'instant : `vf publish` prépare le fichier TikTok, le master et la légende.
+
+Le board Hermès « studio » suit chaque vidéo de l'idée à la publication et prévient le propriétaire sur Telegram à chaque station qui l'attend ; la page du tailnet reçoit les prises depuis l'iPhone ([#7](https://github.com/code-my-life/video-factory/issues/7), RUNBOOK, « Le board studio »).
 
 Chaque étape inscrit dans l'état de la vidéo (`state.json`) l'empreinte de ses entrées et de ses sorties, la version de ses outils, ses paramètres et l'empreinte de son code : `vf status` dit ce qui est périmé, `vf run` ne refait que cela. Les mêmes entrées donnent le même master, image par image (`framemd5`). Le socle vient de [#2](https://github.com/code-my-life/video-factory/issues/2), la chaîne de [#4](https://github.com/code-my-life/video-factory/issues/4) ; son gabarit visuel est provisoire jusqu'au design system vidéo.
 
@@ -46,6 +48,9 @@ uv run vf run ma-video       # jusqu'au master et à son contrôle
 | `uv run vf ingest <id> --capture <nom> <fichier>` | Range une capture d'écran (PNG) ou un court extrait muet (MP4), nettoyé, sous le nom que le script lui donne par `[capture: <nom>]`. |
 | `uv run vf run <id> [--refaire <étape …>]` | Passe les étapes (`transcribe`, `align`, `cut`, `voice`, `compose`, `master`, `qc`) qui n'ont jamais tourné ou sont périmées, puis donne le master 1440x2560 et l'export TikTok 1080x1920. Code 1 si `qc` refuse le master. |
 | `uv run vf status <id>` | Dit, étape par étape, ce qui est à jour, périmé (et pourquoi) ou en attente. |
+| `uv run vf publish <id>` | Vérifie que le master passe qc, puis range dans `VF_MEDIA/publication/<id>/` l'export TikTok, le master et la légende (le titre, le crédit du robot). Ne publie rien. |
+| `uv run vf studio carte <id> ["idée"]` | Ouvre la carte de la vidéo sur le board « studio » : à Idée pour une nouvelle vidéo, sinon à la station que son état prouve. |
+| `uv run vf studio serve`, `uv run vf studio tick` | La page des prises et les voies du board (le service installé par `hermes/install.sh`), ou une seule passe au premier plan. |
 
 ## Les outils figés
 
@@ -58,6 +63,7 @@ FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son i
 - [docs/decisions/0001-chaine-du-monteur.md](docs/decisions/0001-chaine-du-monteur.md) : les décisions qui fondent la chaîne.
 - [docs/decisions/0002-chaine-de-derush-et-de-rendu.md](docs/decisions/0002-chaine-de-derush-et-de-rendu.md) : comment chaque étape est faite, et ce qui reste provisoire.
 - [docs/decisions/0003-projet-hyperframes-gsap-et-registre.md](docs/decisions/0003-projet-hyperframes-gsap-et-registre.md) : le vrai projet HyperFrames de `compose`, GSAP livré, le registre et les skills.
+- [docs/decisions/0004-board-studio.md](docs/decisions/0004-board-studio.md) : le board Hermès « studio », ses stations, ses voies sans modèle et la page des prises.
 - [.claude/skills/video-factory/SKILL.md](.claude/skills/video-factory/SKILL.md) : le skill des agents, du script annoté aux scènes.
 - [docs/map/AGENTS.md](docs/map/AGENTS.md) : la carte du dépôt (ICM, en anglais).
 

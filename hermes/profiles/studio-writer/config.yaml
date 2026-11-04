@@ -1,0 +1,29 @@
+# Profil studio-writer : installé par hermes/install.sh de video-factory, ne pas éditer dans ~/.hermes.
+# Le seul profil du board « studio ». La voie Script le lance une fois par brouillon, sans outil ; le code vérifie le
+# brouillon (schéma, longueur, aucun tiret cadratin) avant de le garder.
+description: "Brouillons de scripts des vidéos de Code My Life (video-factory#7)."
+description_auto: false
+model:
+  default: auto
+  provider: freellmapi
+  api_mode: chat_completions
+  base_url: "http://127.0.0.1:3001/v1"
+  api_key: "${FREELLMAPI_API_KEY}"
+providers:
+  freellmapi:
+    base_url: "http://127.0.0.1:3001/v1"
+    api_key: ${FREELLMAPI_API_KEY}
+    api_mode: chat_completions
+    request_timeout_seconds: 600
+    stale_timeout_seconds: 120
+agent:
+  reasoning_effort: low
+  max_turns: 4
+fallback_providers:
+  - provider: freellmapi
+    model: auto
+  - provider: llamacpp
+    model: Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-plusIQ-TOOLS-NEO-MAX-MTP-Q4_K_M
+# Aucun outil : le brouillon est la réponse texte, écrite dans script.md par le code.
+platform_toolsets:
+  cli: []
