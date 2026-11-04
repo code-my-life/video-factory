@@ -1,0 +1,20 @@
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Video content never enters this repository: scripts and states live in video-content,
+# media in the local store (VF_MEDIA). CI checks it too (scripts/check_no_content.py).
+videos/
+*.mov
+*.mp4
+*.m4a
+*.wav
+*.heic
+# Small synthetic fixtures stay allowed (size capped by the same check).
+!tests/fixtures/**
