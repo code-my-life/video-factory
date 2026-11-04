@@ -1,0 +1,46 @@
+name: CI
+
+# Lint, tests and the "no content" check. Every push runs it, on any branch: this repository is public, so a pushed
+# branch is public too, and video content must be caught before any pull request.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-content:
+    name: Aucun contenu
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Aucun média ni dossier videos/ suivi par git
+        run: python3 scripts/check_no_content.py
+
+  verify:
+    name: Lint et tests (Python 3.12)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.12.3'
+          python-version: '3.12'
+          enable-cache: true
+      - name: Installer (uv.lock, sans le modifier)
+        run: uv sync --locked
+      - name: Lint (ruff)
+        run: uv run ruff check
+      - name: Format (ruff)
+        run: uv run ruff format --check
+      - name: Tests (pytest)
+        run: uv run pytest

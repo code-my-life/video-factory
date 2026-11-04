@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/toolchain/tools.lock.schema.json",
+  "title": "Outils figés de video-factory, version 1",
+  "description": "toolchain/tools.lock.json : chaque outil externe, figé par sa version et son empreinte SHA-256, avec son adresse de téléchargement et sa commande d'installation. vf doctor vérifie l'installation contre ce fichier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lock_version", "platform", "tools"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "lock_version": { "const": 1 },
+    "platform": { "const": "linux-x86_64" },
+    "not_pinned_yet": {
+      "description": "Ce qui manque encore au lock, et l'issue qui l'apporte.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/archive" },
+          { "$ref": "#/$defs/file" },
+          { "$ref": "#/$defs/source_build" },
+          { "$ref": "#/$defs/npm" },
+          { "$ref": "#/$defs/docker_image" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "https": { "type": "string", "pattern": "^https://[^\\s]+$" },
+    "relative_path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\\\s]+$" },
+    "version_check": {
+      "description": "Une commande, lancée depuis le dossier de l'outil, dont la sortie contient « expect ».",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "expect"],
+      "properties": {
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "prefixItems": [{ "$ref": "#/$defs/relative_path" }],
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "expect": { "type": "string", "minLength": 1 }
+      }
+    },
+    "common": {
+      "type": "object",
+      "required": ["name", "kind", "version", "about", "source", "url", "sha256", "install"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:-]*$" },
+        "about": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "install": { "type": "string", "pattern": "^uv run vf doctor --install [a-z0-9][a-z0-9.-]*$" },
+        "requires": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/name" } }
+      }
+    },
+    "archive": {
+      "description": "Une archive tar téléchargée, vérifiée, puis extraite ; tree_sha256 est l'empreinte de l'arbre extrait.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["strip_components", "tree_sha256", "version_check"],
+      "properties": {
+        "kind": { "const": "archive" },
+        "url": { "$ref": "#/$defs/https" },
+        "strip_components": { "type": "integer", "minimum": 0 },
+        "tree_sha256": { "$ref": "#/$defs/sha256" },
+        "version_check": { "$ref": "#/$defs/version_check" }
+      },
+      "unevaluatedProperties": false
+    },
+    "file": {
+      "description": "Un fichier téléchargé tel quel (un modèle) : son empreinte fixe aussi sa version.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["file"],
+      "properties": {
+        "kind": { "const": "file" },
+        "url": { "$ref": "#/$defs/https" },
+        "file": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+      },
+      "unevaluatedProperties": false
+    },
+    "source_build": {
+      "description": "Une archive de sources à un tag, vérifiée par son empreinte et par le commit qu'elle porte, puis construite avec CMake.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["commit", "requires", "cmake_args", "target", "binary", "version_check"],
+      "properties": {
+        "kind": { "const": "source-build" },
+        "url": { "$ref": "#/$defs/https" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "cmake_args": { "type": "array", "items": { "type": "string", "pattern": "^-D[A-Z0-9_]+=[A-Za-z0-9_.-]+$" } },
+        "target": { "type": "string", "minLength": 1 },
+        "binary": { "$ref": "#/$defs/relative_path" },
+        "version_check": { "$ref": "#/$defs/version_check" }
+      },
+      "unevaluatedProperties": false
+    },
+    "npm": {
+      "description": "Un paquet npm installé par npm ci depuis un package-lock.json du dépôt ; tree_sha256 est l'empreinte du paquet installé.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["package", "lockfile", "requires", "tree_sha256", "env", "version_check"],
+      "properties": {
+        "kind": { "const": "npm" },
+        "url": { "$ref": "#/$defs/https" },
+        "package": { "type": "string", "minLength": 1 },
+        "lockfile": { "$ref": "#/$defs/relative_path" },
+        "tree_sha256": { "$ref": "#/$defs/sha256" },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "version_check": { "$ref": "#/$defs/version_check" },
+        "post_install": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "prefixItems": [{ "$ref": "#/$defs/relative_path" }],
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "config_expect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "values"],
+          "properties": {
+            "path": { "type": "string", "pattern": "^~/[^\\s]+$" },
+            "values": { "type": "object", "minProperties": 1 }
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "docker_image": {
+      "description": "Une image Docker tirée par son digest (sha256) et étiquetée sous le nom qu'attend l'outil qui la construit ou l'utilise.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["image"],
+      "properties": {
+        "kind": { "const": "docker-image" },
+        "url": { "type": "string", "pattern": "^[a-z0-9.-]+(?:/[a-z0-9._-]+)+:[A-Za-z0-9._-]+$" },
+        "image": { "type": "string", "pattern": "^[a-z0-9._/-]+:[A-Za-z0-9._-]+$" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

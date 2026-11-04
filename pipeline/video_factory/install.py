@@ -1,0 +1,264 @@
+"""`vf doctor --install`: download each tool of the lock, check its SHA-256 before any use, then put it in place.
+
+Nothing reaches the tools directory unverified: a download is hashed while it is written and refused on any gap, an
+archive is extracted with the « data » filter (no absolute path, no escape, no device), a source archive must also carry
+the pinned commit, and a tool directory is replaced in one rename once it is complete.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import http.client
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import urllib.request
+from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
+
+from video_factory import doctor
+from video_factory import lock as lockfile
+from video_factory.hashing import CHUNK, npm_integrity, sha256_file, tree_sha256
+from video_factory.paths import Places
+
+Opener = Callable[[str], object]
+
+
+class InstallError(Exception):
+    """A step of an installation failed; nothing unverified was put in place."""
+
+
+def open_url(url: str) -> object:
+    request = urllib.request.Request(url, headers={"User-Agent": "video-factory"})
+    return urllib.request.urlopen(request, timeout=60)
+
+
+def download(url: str, expected: str, target: Path, opener: Opener = open_url) -> Path:
+    """Write url to target while hashing it; keep it only if its SHA-256 is the expected one."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(target.name + ".part")
+    digest = hashlib.sha256()
+    try:
+        with opener(url) as response, partial.open("wb") as out:
+            while chunk := response.read(CHUNK):
+                digest.update(chunk)
+                out.write(chunk)
+    except (OSError, http.client.HTTPException) as exc:
+        partial.unlink(missing_ok=True)
+        raise InstallError(f"{url} : téléchargement impossible ({exc})") from exc
+    if digest.hexdigest() != expected:
+        partial.unlink(missing_ok=True)
+        raise InstallError(f"{url} : empreinte {digest.hexdigest()} au lieu de {expected}, fichier refusé")
+    partial.replace(target)
+    return target
+
+
+def strip_filter(strip: int) -> Callable[[tarfile.TarInfo, str], tarfile.TarInfo | None]:
+    """The « data » extraction filter, after removing the first `strip` components of every name."""
+
+    def keep(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo | None:
+        parts = PurePosixPath(member.name).parts
+        if len(parts) <= strip:
+            return None
+        changes = {"name": "/".join(parts[strip:])}
+        if member.islnk():
+            changes["linkname"] = "/".join(PurePosixPath(member.linkname).parts[strip:])
+        return tarfile.data_filter(member.replace(**changes, deep=False), destination)
+
+    return keep
+
+
+def extract(archive: Path, destination: Path, strip: int) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(archive) as tar:
+            tar.extractall(destination, filter=strip_filter(strip))
+    except tarfile.TarError as exc:
+        raise InstallError(f"{archive.name} : archive refusée ({exc})") from exc
+
+
+def archive_commit(archive: Path) -> str | None:
+    """The commit GitHub writes in the pax header of a source archive."""
+    with tarfile.open(archive) as tar:
+        return tar.pax_headers.get("comment")
+
+
+def swap_in(staged: Path, final: Path) -> None:
+    """Replace final by staged in one rename; the previous directory is removed only afterwards."""
+    final.parent.mkdir(parents=True, exist_ok=True)
+    old = final.with_name(final.name + ".old")
+    if old.exists():
+        shutil.rmtree(old)
+    if final.exists():
+        final.rename(old)
+    staged.rename(final)
+    if old.exists():
+        shutil.rmtree(old)
+
+
+@contextmanager
+def workspace(tools_root: Path, name: str):
+    """A scratch directory next to the tools, so the final rename never crosses a file system."""
+    tools_root.mkdir(parents=True, exist_ok=True)
+    path = Path(tempfile.mkdtemp(prefix=f".{name}-", dir=tools_root))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def run_step(argv: list[str], env: Mapping[str, str], cwd: Path, what: str) -> None:
+    """A build or install command, its output shown as it runs; a failure stops the installation."""
+    print(f"  $ {' '.join(argv)}", flush=True)
+    try:
+        done = subprocess.run(argv, env=dict(env), cwd=cwd, check=False)
+    except OSError as exc:
+        raise InstallError(f"{what} : {argv[0]} ({exc})") from exc
+    if done.returncode != 0:
+        raise InstallError(f"{what} : « {' '.join(argv)} » a échoué (code {done.returncode})")
+
+
+def install_archive(tool: lockfile.Tool, final: Path, scratch: Path, opener: Opener) -> None:
+    archive = download(str(tool["url"]), str(tool["sha256"]), scratch / "download", opener)
+    staged = scratch / "staged"
+    extract(archive, staged, int(tool["strip_components"]))
+    found = tree_sha256(staged)
+    if found != tool["tree_sha256"]:
+        raise InstallError(f"{tool['name']} : contenu extrait d'empreinte {found} au lieu de {tool['tree_sha256']}")
+    swap_in(staged, final)
+
+
+def install_file(tool: lockfile.Tool, final: Path, scratch: Path, opener: Opener) -> None:
+    staged = scratch / "staged"
+    download(str(tool["url"]), str(tool["sha256"]), staged / str(tool["file"]), opener)
+    swap_in(staged, final)
+
+
+def install_source_build(
+    tool: lockfile.Tool, lock: Mapping[str, object], places: Places, final: Path, scratch: Path, opener: Opener
+) -> None:
+    archive = download(str(tool["url"]), str(tool["sha256"]), scratch / "download", opener)
+    commit = archive_commit(archive)
+    if commit != tool["commit"]:
+        raise InstallError(f"{tool['name']} : l'archive porte le commit {commit} au lieu de {tool['commit']}")
+    source, build, staged = scratch / "source", scratch / "build", scratch / "staged"
+    extract(archive, source, 1)
+    env = lockfile.tool_env(tool, lock, places.tools, os.environ)
+    cmake = str(lockfile.tool_dir(places.tools, lockfile.by_name(lock)["cmake"]) / "bin" / "cmake")
+    run_step([cmake, "-S", str(source), "-B", str(build), *map(str, tool["cmake_args"])], env, scratch, "configuration")
+    jobs = str(os.cpu_count() or 2)
+    run_step([cmake, "--build", str(build), "--target", str(tool["target"]), "-j", jobs], env, scratch, "compilation")
+    binary = staged / str(tool["binary"])
+    binary.parent.mkdir(parents=True)
+    shutil.copy2(build / str(tool["binary"]), binary)
+    stamp = doctor.build_stamp(tool) | {"binary_sha256": sha256_file(binary)}
+    (staged / doctor.BUILD_STAMP).write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+    swap_in(staged, final)
+
+
+def lockfile_integrity(lockfile_path: Path, package: str) -> str | None:
+    data = json.loads(lockfile_path.read_text(encoding="utf-8"))
+    return data.get("packages", {}).get(f"node_modules/{package}", {}).get("integrity")
+
+
+def install_npm(
+    tool: lockfile.Tool,
+    lock: Mapping[str, object],
+    places: Places,
+    final: Path,
+    scratch: Path,
+    opener: Opener,
+    repo_root: Path,
+) -> None:
+    tarball = download(str(tool["url"]), str(tool["sha256"]), scratch / "download", opener)
+    npm_lock = repo_root / str(tool["lockfile"])
+    pinned = lockfile_integrity(npm_lock, str(tool["package"]))
+    if npm_integrity(tarball) != pinned:
+        raise InstallError(f"{tool['name']} : {tool['lockfile']} ne fige pas l'archive vérifiée ({pinned})")
+    staged = scratch / "staged"
+    staged.mkdir()
+    shutil.copy2(npm_lock, staged / "package-lock.json")
+    shutil.copy2(npm_lock.with_name("package.json"), staged / "package.json")
+    env = lockfile.tool_env(tool, lock, places.tools, os.environ)
+    npm = str(lockfile.tool_dir(places.tools, lockfile.by_name(lock)["node"]) / "bin" / "npm")
+    run_step([npm, "ci", "--ignore-scripts", "--no-audit", "--no-fund"], env, staged, "npm ci")
+    found = tree_sha256(staged / "node_modules" / str(tool["package"]))
+    if found != tool["tree_sha256"]:
+        raise InstallError(f"{tool['name']} : paquet installé d'empreinte {found} au lieu de {tool['tree_sha256']}")
+    stamp = {"lockfile_sha256": sha256_file(npm_lock)}
+    (staged / doctor.INSTALL_STAMP).write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
+    swap_in(staged, final)
+    for command in tool.get("post_install", []):
+        run_step([str(final / command[0]), *command[1:]], env, final, "après l'installation")
+
+
+def install_docker_image(tool: lockfile.Tool) -> None:
+    image = str(tool["image"])
+    pinned = f"{doctor.image_repository(image)}@sha256:{tool['sha256']}"
+    run_step(["docker", "pull", pinned], os.environ, Path.cwd(), "docker pull")
+    run_step(["docker", "tag", pinned, image], os.environ, Path.cwd(), "docker tag")
+
+
+def install_tool(
+    tool: lockfile.Tool, lock: Mapping[str, object], places: Places, repo_root: Path, opener: Opener = open_url
+) -> None:
+    kind = tool["kind"]
+    if kind == "docker-image":
+        install_docker_image(tool)
+        return
+    final = lockfile.tool_dir(places.tools, tool)
+    try:
+        with workspace(places.tools, str(tool["name"])) as scratch:
+            if kind == "archive":
+                install_archive(tool, final, scratch, opener)
+            elif kind == "file":
+                install_file(tool, final, scratch, opener)
+            elif kind == "source-build":
+                install_source_build(tool, lock, places, final, scratch, opener)
+            else:
+                install_npm(tool, lock, places, final, scratch, opener, repo_root)
+    except OSError as exc:
+        raise InstallError(f"{tool['name']} : {exc}") from exc
+
+
+def install(
+    lock: Mapping[str, object],
+    names: list[str],
+    places: Places,
+    repo_root: Path,
+    check: Callable[[lockfile.Tool], list[doctor.Problem]],
+    opener: Opener = open_url,
+) -> list[str]:
+    """Install the named tools (all of them when names is empty) and what they require, skipping those already in
+    place; returns the names installed. A failure stops at the first tool that cannot be installed."""
+    order = lockfile.requirement_order(lock, names or [str(tool["name"]) for tool in lock["tools"]])
+    tools = lockfile.by_name(lock)
+    done = []
+    for name in order:
+        if not check(tools[name]):
+            print(f"ok     {name} {tools[name]['version']} : déjà en place", flush=True)
+            continue
+        print(f"…      {name} {tools[name]['version']} : installation", flush=True)
+        install_tool(tools[name], lock, places, repo_root, opener)
+        done.append(name)
+    return done
+
+
+def main_install(
+    lock: Mapping[str, object],
+    names: list[str],
+    places: Places,
+    repo_root: Path,
+    check: Callable[[lockfile.Tool], list[doctor.Problem]],
+) -> int:
+    try:
+        install(lock, names, places, repo_root, check)
+    except (InstallError, lockfile.LockError) as exc:
+        print(f"vf doctor --install : {exc}", file=sys.stderr)
+        return 1
+    return 0

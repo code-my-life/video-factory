@@ -1,0 +1,31 @@
+---
+type: object
+cluster: pipeline
+universe: live
+paths:
+  - pipeline/video_factory/cli.py
+  - pipeline/video_factory/__init__.py
+hits:
+  - pyproject.toml
+  - README.md
+  - AGENTS.md
+  - docs/RUNBOOK.md
+  - tests/test_new.py
+---
+
+# cli
+
+The `vf` command: it parses `vf doctor [--install [TOOL ...]]` and `vf new <id>`, hands the environment and the home directory to the modules, and turns their results into French messages and exit codes.
+
+## Why this shape
+
+Everything that depends on the session (environment variables, home directory, printing, exit codes) stays in this module, so the other modules take those as arguments and are tested without touching the real machine.
+
+## If you change this
+
+- **Hits:** the console script `vf` in `pyproject.toml`; the commands documented in `README.md`, `AGENTS.md` and `docs/RUNBOOK.md`; `tests/test_new.py`, which calls `main`.
+- **Does not hit:** what a check means ([doctor](doctor.md)) or what `vf new` writes ([videos](videos.md)): the CLI only routes to them.
+
+## See
+
+- [`main`](../../../../pipeline/video_factory/cli.py), [`run_doctor`](../../../../pipeline/video_factory/cli.py), [`run_new`](../../../../pipeline/video_factory/cli.py)

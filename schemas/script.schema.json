@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/schemas/script.schema.json",
+  "title": "En-tête d'un script, version 1",
+  "description": "L'en-tête de video-content/videos/<id>/script.md, entre deux lignes « --- ». Le corps qui suit est le texte dit, phrase par phrase, avec ses annotations entre crochets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "titre", "plateforme", "duree_visee"],
+  "properties": {
+    "id": {
+      "description": "Identifiant de la vidéo, égal au nom de son dossier (même règle que dans state.schema.json).",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "titre": {
+      "description": "Titre de la vidéo.",
+      "type": "string",
+      "minLength": 1
+    },
+    "plateforme": {
+      "description": "Plateforme visée en premier : TikTok, pour Creator Rewards.",
+      "const": "tiktok"
+    },
+    "duree_visee": {
+      "description": "Durée visée en secondes : une minute ou plus pour Creator Rewards, 90 s au plus.",
+      "type": "integer",
+      "minimum": 61,
+      "maximum": 90
+    }
+  }
+}
