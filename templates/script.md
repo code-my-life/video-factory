@@ -2,7 +2,7 @@
 id: "{{id}}"
 titre: "Titre à écrire"
 plateforme: tiktok
-duree_visee: 75
+duree_visee: 63
 ---
 
 <!--
@@ -11,5 +11,5 @@ Gabarit de vf new : remplacer ce commentaire par le texte dit.
 - Un plan de motion design plein cadre se note entre crochets, après le mot où il commence :
   [stat: …], [etapes: …], [code: …].
 - Un zoom d'insistance : [zoom], après le mot à appuyer.
-- En-tête : duree_visee de 61 à 90 s (une minute ou plus pour TikTok Creator Rewards).
+- En-tête : duree_visee de 61 à 65 s (à peine plus d'une minute, pour TikTok Creator Rewards).
 -->

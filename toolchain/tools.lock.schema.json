@@ -24,7 +24,8 @@
           { "$ref": "#/$defs/file" },
           { "$ref": "#/$defs/source_build" },
           { "$ref": "#/$defs/npm" },
-          { "$ref": "#/$defs/docker_image" }
+          { "$ref": "#/$defs/docker_image" },
+          { "$ref": "#/$defs/docker_build" }
         ]
       }
     }
@@ -51,7 +52,7 @@
     },
     "common": {
       "type": "object",
-      "required": ["name", "kind", "version", "about", "source", "url", "sha256", "install"],
+      "required": ["name", "kind", "version", "about", "source", "sha256", "install"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:-]*$" },
@@ -65,7 +66,7 @@
     "archive": {
       "description": "Une archive tar téléchargée, vérifiée, puis extraite ; tree_sha256 est l'empreinte de l'arbre extrait.",
       "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["strip_components", "tree_sha256", "version_check"],
+      "required": ["url", "strip_components", "tree_sha256", "version_check"],
       "properties": {
         "kind": { "const": "archive" },
         "url": { "$ref": "#/$defs/https" },
@@ -78,7 +79,7 @@
     "file": {
       "description": "Un fichier téléchargé tel quel (un modèle) : son empreinte fixe aussi sa version.",
       "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["file"],
+      "required": ["url", "file"],
       "properties": {
         "kind": { "const": "file" },
         "url": { "$ref": "#/$defs/https" },
@@ -89,7 +90,7 @@
     "source_build": {
       "description": "Une archive de sources à un tag, vérifiée par son empreinte et par le commit qu'elle porte, puis construite avec CMake.",
       "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["commit", "requires", "cmake_args", "target", "binary", "version_check"],
+      "required": ["url", "commit", "requires", "cmake_args", "target", "binary", "version_check"],
       "properties": {
         "kind": { "const": "source-build" },
         "url": { "$ref": "#/$defs/https" },
@@ -104,7 +105,7 @@
     "npm": {
       "description": "Un paquet npm installé par npm ci depuis un package-lock.json du dépôt ; tree_sha256 est l'empreinte du paquet installé.",
       "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["package", "lockfile", "requires", "tree_sha256", "env", "version_check"],
+      "required": ["url", "package", "lockfile", "requires", "tree_sha256", "env", "version_check"],
       "properties": {
         "kind": { "const": "npm" },
         "url": { "$ref": "#/$defs/https" },
@@ -137,11 +138,31 @@
     "docker_image": {
       "description": "Une image Docker tirée par son digest (sha256) et étiquetée sous le nom qu'attend l'outil qui la construit ou l'utilise.",
       "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["image"],
+      "required": ["url", "image"],
       "properties": {
         "kind": { "const": "docker-image" },
         "url": { "type": "string", "pattern": "^[a-z0-9.-]+(?:/[a-z0-9._-]+)+:[A-Za-z0-9._-]+$" },
         "image": { "type": "string", "pattern": "^[a-z0-9._/-]+:[A-Za-z0-9._-]+$" }
+      },
+      "unevaluatedProperties": false
+    },
+    "docker_build": {
+      "description": "Une image Docker construite sur la machine depuis un Dockerfile du dépôt, chaque couche figée et la construction reproductible : sha256 est le digest de son manifeste (son identifiant dans le magasin containerd de Docker), config_sha256 celui de sa configuration (son identifiant dans l'ancien magasin). context_sha256 fige le dossier de construction, build_args les arguments passés à docker build.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["config_sha256", "requires", "image", "dockerfile", "context", "context_sha256", "build_args"],
+      "properties": {
+        "kind": { "const": "docker-build" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "image": { "type": "string", "pattern": "^[a-z0-9._/-]+:[A-Za-z0-9._-]+$" },
+        "dockerfile": { "$ref": "#/$defs/relative_path" },
+        "context": { "$ref": "#/$defs/relative_path" },
+        "context_sha256": { "$ref": "#/$defs/sha256" },
+        "build_args": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
       },
       "unevaluatedProperties": false
     }

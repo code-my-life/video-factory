@@ -3,8 +3,8 @@
   "lock_version": 1,
   "platform": "linux-x86_64",
   "not_pinned_yet": [
-    "Les polices : elles arrivent avec l'issue du design system vidéo.",
-    "L'image de rendu de HyperFrames : son CLI la construit sur la machine depuis le Dockerfile.render de son paquet, sans image publiée ; ses paquets Debian, son chrome-headless-shell « stable » et ses dépendances npm ne sont pas figés. Seule sa base l'est ici (hyperframes-render-base) ; l'image se fige avec l'étape compose (#4)."
+    "Les polices du design system vidéo : elles arrivent avec son issue. Le gabarit provisoire de compose embarque une seule police, Inter Bold (OFL), figée dans le dépôt (templates/composition/assets/fonts/).",
+    "Les paquets Python (LiteRT, numpy, jsonschema) ne sont pas ici : uv.lock les fige, par version et empreinte."
   ],
   "tools": [
     {
@@ -145,6 +145,30 @@
       "sha256": "4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da",
       "install": "uv run vf doctor --install hyperframes-render-base",
       "image": "node:22.23.4-bookworm-slim"
+    },
+    {
+      "name": "hyperframes-render",
+      "kind": "docker-build",
+      "version": "0.9.12-1",
+      "about": "Image de rendu de HyperFrames 0.9.12, construite sur la machine depuis toolchain/hyperframes/Dockerfile.render, chaque couche figée : compose la lance lui-même, sans réseau.",
+      "source": "toolchain/hyperframes/Dockerfile.render : base hyperframes-render-base, paquets Debian de snapshot.debian.org au 27 octobre 2026, chrome-headless-shell 152.0.7977.30 (Chrome for Testing), FFmpeg n8.0.1 de BtbN (celui du Dockerfile.render de HyperFrames 0.9.12), npm ci depuis toolchain/hyperframes/package-lock.json",
+      "sha256": "2301e4566bf68a03924c4f2ab29709efa4ef72ffdae56dcfa1e92adaedfd009d",
+      "config_sha256": "8bbc140969167d0e028c6ec5b27d6a9ed28fbe8b67e35ac048c4ac6dbe53ebf6",
+      "install": "uv run vf doctor --install hyperframes-render",
+      "requires": ["hyperframes-render-base"],
+      "image": "vf-hyperframes-render:0.9.12-1",
+      "dockerfile": "toolchain/hyperframes/Dockerfile.render",
+      "context": "toolchain/hyperframes",
+      "context_sha256": "a8cdd9485534e733f82bb04040aa26063583bc076d981e4746c77dd8643faf92",
+      "build_args": {
+        "BASE_IMAGE": "node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da",
+        "DEBIAN_SNAPSHOT": "20261027T000000Z",
+        "CHROME_VERSION": "152.0.7977.30",
+        "CHROME_SHA256": "1b150320178ecabe39726bcf3198ebb896ba2b7a07d870db1710914c42d55221",
+        "FFMPEG_URL": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/ffmpeg-n8.0.1-66-g27b8d1a017-linux64-gpl-8.0.tar.xz",
+        "FFMPEG_SHA256": "26d2ecd0cefba99f9d1ea92252a3a4f743a58df4c1c3cf9f8bbaaa40b1fca5b0",
+        "SOURCE_DATE_EPOCH": "1793059200"
+      }
     }
   ]
 }

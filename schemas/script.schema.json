@@ -23,10 +23,10 @@
       "const": "tiktok"
     },
     "duree_visee": {
-      "description": "Durée visée en secondes : une minute ou plus pour Creator Rewards, 90 s au plus.",
+      "description": "Durée visée en secondes, de 61 à 65 : à peine plus d'une minute, le seuil de TikTok Creator Rewards (décision du propriétaire du 4 novembre 2026). Ces deux bornes sont aussi celles que qc tient sur le master : vf les lit ici.",
       "type": "integer",
       "minimum": 61,
-      "maximum": 90
+      "maximum": 65
     }
   }
 }
