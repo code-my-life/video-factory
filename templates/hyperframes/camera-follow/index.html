@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The « camera follow » scene of video-factory, written by vf capture: a capture of a real app, frame by frame at
+      x3 (assets/capture/capture.mp4), seen by a camera that follows one of its elements in a 1440x2560 frame. The
+      camera path is computed by vf (pipeline/video_factory/capture/camera.py): one [scale, x, y] per frame, where
+      scale is output pixels per CSS pixel and (x, y) where the capture's CSS origin lands; one linear tween per frame
+      between two poses. Only the stage of the capture shows; around it, the stage's own ground.
+
+      Motion blur: HyperFrames' render-time blur leaves out a layer that moves over the whole frame, so it is made here
+      by accumulation. LAYERS holds COPIES copies of the camera layer; copy k trails by k / (COPIES - 1) of the shutter
+      (a fraction of a frame) and is drawn at 1 / (k + 1), so the copies average. During the holds they would coincide:
+      every copy but the first is hidden there, which keeps the render cost of the blur to the moves.
+
+      vf fills DURATION (seconds), LAYERS (the copies), LABELS (the titles, timed clips) and CONFIG (the path, which
+      frames move, the stage and its ground, the capture's size). Nothing is fetched: GSAP and the font are local.
+    -->
+    <script src="assets/lib/gsap/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Mona Sans";
+        font-weight: 200 900;
+        font-style: normal;
+        src: url("assets/fonts/MonaSans-wght-latin.woff2") format("woff2");
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+      }
+      .cam {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+      }
+      .cam video {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      .label {
+        position: absolute;
+        left: 0;
+        width: 1440px;
+        display: flex;
+        justify-content: center;
+      }
+      .pill {
+        font-family: "Mona Sans", sans-serif;
+        font-weight: 650;
+        font-size: 92px;
+        line-height: 1;
+        letter-spacing: -0.01em;
+        color: #f0f6fc;
+        background: rgba(13, 17, 23, 0.94);
+        border: 3px solid #3d444d;
+        border-radius: 999px;
+        padding: 30px 60px 34px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-fps="30"
+      data-width="1440"
+      data-height="2560"
+    >
+{{LAYERS}}
+{{LABELS}}
+    </div>
+    <script id="camera-config" type="application/json">{{CONFIG}}</script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        var config = JSON.parse(document.getElementById("camera-config").textContent);
+        var FPS = config.fps;
+        var root = document.getElementById("root");
+        root.style.background = config.ground;
+        var capture = config.capture;
+        // Only the stage shows: the video is clipped to it, in capture pixels.
+        var stage = config.stage.map(function (value) {
+          return value * capture.dsf;
+        });
+        var clip =
+          "inset(" + stage[1] + "px " + (capture.width - stage[0] - stage[2]) + "px " +
+          (capture.height - stage[1] - stage[3]) + "px " + stage[0] + "px)";
+        var tl = gsap.timeline({ paused: true });
+        var state = function (pose) {
+          return { x: pose[1], y: pose[2], scale: pose[0] / capture.dsf };
+        };
+        var copies = config.blur.copies;
+        for (var k = 0; k < copies; k++) {
+          var wrap = document.getElementById("cam-" + k);
+          var media = document.getElementById("capture-" + k);
+          wrap.style.width = media.style.width = capture.width + "px";
+          wrap.style.height = media.style.height = capture.height + "px";
+          media.style.clipPath = clip;
+          wrap.style.opacity = String(1 / (k + 1));
+          var lag = copies > 1 ? (k * config.blur.shutter) / (copies - 1) / FPS : 0;
+          tl.set(wrap, state(config.path[0]), 0);
+          for (var i = 1; i < config.path.length; i++) {
+            var to = state(config.path[i]);
+            to.duration = 1 / FPS;
+            to.ease = "none";
+            tl.to(wrap, to, (i - 1) / FPS + lag);
+          }
+          if (k === 0) continue;
+          // The trailing copies show only while the camera moves; each change half a frame before the frame it is for.
+          var shown = null;
+          for (var f = 0; f < config.moving.length; f++) {
+            var visible = config.moving[f] === 1;
+            if (visible === shown) continue;
+            tl.set(wrap, { visibility: visible ? "visible" : "hidden" }, Math.max(0, (f - 0.5) / FPS));
+            shown = visible;
+          }
+        }
+        // Titles: each blurs in (8 px to 0 in 0.18 s), holds still, blurs out in 0.15 s.
+        config.labels.forEach(function (label, index) {
+          var pill = "#label-" + index + " .pill";
+          var box = document.getElementById("label-" + index);
+          box.style.top = config.band.top + (config.band.height - 156) / 2 + "px";
+          tl.fromTo(pill, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power2.out" }, label.start);
+          if (label.end < config.duration) {
+            tl.to(pill, { opacity: 0, filter: "blur(8px)", duration: 0.15, ease: "power2.in" }, label.end - 0.15);
+          }
+        });
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>

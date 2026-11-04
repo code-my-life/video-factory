@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "plan3-graphe",
+  "about": "Vidéo 1, plan 3 : sur le graphe zoomé, claude-cockpit#73 glisse du brief au code puis à la vérification, la caméra la suit.",
+  "app": "factory-live",
+  "device": "desktop",
+  "window": { "width": 1440, "height": 1600 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 55.5, "end": 64.5 },
+  "actions": [{ "at": 50, "do": "zoom", "scale": 1.2, "x": 760, "y": 560, "measure": "[data-box=\"brief\"]" }],
+  "stage": "section:has([data-box]) > div",
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box", "flags": ["data-arriving"] },
+    "traveller": { "selector": "[data-traveller=\"claude-cockpit#73\"]" }
+  },
+  "camera": {
+    "follow": "issue",
+    "arriving": "data-arriving",
+    "scale": 2,
+    "move": 0.5,
+    "anchor": { "x": 0.5, "y": 0.4 },
+    "labels": { "brief": "Le brief", "implementation": "Le code", "gate:failfirst": "La vérification" }
+  }
+}

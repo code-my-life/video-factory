@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "iphone-ligne",
+  "about": "L'iPhone : la ligne d'usine de la démo en 390x844, tactile, en x3, une seconde au moment où claude-cockpit#73 quitte le brief.",
+  "app": "factory-live",
+  "device": "iphone",
+  "window": { "width": 390, "height": 844 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 57.5, "end": 58.5 },
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box", "flags": ["data-arriving"] }
+  }
+}

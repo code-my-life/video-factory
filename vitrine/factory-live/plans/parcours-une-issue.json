@@ -1,0 +1,17 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "parcours-une-issue",
+  "about": "Relevé de la variante : la station de claude-cockpit#73 sur toute la ligne, de l'intake à Terminé, deux images par seconde.",
+  "app": "factory-live",
+  "device": "desktop",
+  "window": { "width": 1440, "height": 1600 },
+  "scale": 1,
+  "fps": 2,
+  "scenario": { "start": 0, "end": 95 },
+  "stage": "section:has([data-box]) > div",
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box", "flags": ["data-arriving"] }
+  },
+  "texts": false
+}

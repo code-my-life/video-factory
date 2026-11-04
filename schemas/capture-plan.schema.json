@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/schemas/capture-plan.schema.json",
+  "title": "Plan de capture d'une app, version 1",
+  "description": "Un plan que vf capture tourne : la démo d'une app de vitrine/<app>/, pilotée par Playwright à horloge simulée, image par image, sur une plage de temps de son scénario. vf capture écrit les images, la position de chaque élément suivi et, si le plan a une caméra, la scène HyperFrames « caméra qui suit » et son rendu.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plan_version", "name", "app", "device", "window", "scenario", "track"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "plan_version": { "const": 1 },
+    "name": {
+      "description": "Nom du plan : minuscules, chiffres et tirets.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "about": { "description": "Ce que montre le plan, en une phrase.", "type": "string", "minLength": 1 },
+    "app": {
+      "description": "Le dossier vitrine/<app>/ : sa source figée (source.json) et sa variante de scénario.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "device": {
+      "description": "L'appareil : l'ordinateur, ou l'iPhone (fenêtre 390x844, tactile).",
+      "enum": ["desktop", "iphone"]
+    },
+    "window": {
+      "description": "La fenêtre, en pixels CSS. À l'ordinateur, assez haute pour remplir un cadre vertical une fois zoomée (par exemple 1440x1600).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 2560 },
+        "height": { "type": "integer", "minimum": 480, "maximum": 2560 }
+      }
+    },
+    "scale": {
+      "description": "Pixels de l'image par pixel CSS. Les plans d'une vidéo se tournent en x3 ; x1 sert aux relevés.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "default": 3
+    },
+    "fps": { "description": "Images par seconde du scénario.", "type": "integer", "minimum": 1, "maximum": 60, "default": 30 },
+    "view": {
+      "description": "L'écran ouvert au départ, par son jeton d'adresse (« #interventions ») ; vide pour l'écran d'accueil.",
+      "type": "string",
+      "pattern": "^(#[A-Za-z0-9/_-]*)?$",
+      "default": ""
+    },
+    "scenario": {
+      "description": "La plage du scénario de la démo filmée, en secondes depuis son lancement : de start (inclus) à end (exclu).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "number", "minimum": 0, "maximum": 600 },
+        "end": { "type": "number", "minimum": 0, "maximum": 600 }
+      }
+    },
+    "actions": {
+      "description": "Les gestes faits dans l'app, chacun à son instant du scénario (avant ou pendant la plage filmée), dans l'ordre du temps.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/zoom" },
+          { "$ref": "#/$defs/click" }
+        ]
+      },
+      "default": []
+    },
+    "stage": {
+      "description": "Le sélecteur CSS de la scène filmée (le graphe, par exemple) : la caméra n'en sort pas, et hors d'elle la scène HyperFrames prolonge son fond.",
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "description": "Les éléments suivis, par nom : leur position est relevée à chaque image, avec leur groupe (l'attribut d'un ancêtre) et leurs drapeaux (des attributs présents ou non).",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["selector"],
+        "properties": {
+          "selector": { "type": "string", "minLength": 1 },
+          "group": { "type": "string", "pattern": "^data-[a-z0-9-]+$" },
+          "flags": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^data-[a-z0-9-]+$" } }
+        }
+      }
+    },
+    "texts": {
+      "description": "Relever à chaque image la taille et la place de chaque texte visible de la scène (pour tenir les 26 px de l'image finale).",
+      "type": "boolean",
+      "default": true
+    },
+    "camera": { "$ref": "#/$defs/camera" }
+  },
+  "$defs": {
+    "at": { "type": "number", "minimum": 0, "maximum": 600 },
+    "zoom": {
+      "description": "Le zoom de l'app elle-même (Ctrl et la molette), vers une échelle, autour d'un point de la fenêtre.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "do", "scale", "x", "y"],
+      "properties": {
+        "at": { "$ref": "#/$defs/at" },
+        "do": { "const": "zoom" },
+        "scale": { "type": "number", "minimum": 0.3, "maximum": 1.6 },
+        "measure": {
+          "description": "Le sélecteur de l'élément dont le rapport de taille donne l'échelle courante.",
+          "type": "string",
+          "minLength": 1
+        },
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 }
+      }
+    },
+    "click": {
+      "description": "Un clic (à l'ordinateur) ou un toucher (à l'iPhone) sur le premier élément d'un sélecteur.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "do", "selector"],
+      "properties": {
+        "at": { "$ref": "#/$defs/at" },
+        "do": { "enum": ["click", "tap"] },
+        "selector": { "type": "string", "minLength": 1 }
+      }
+    },
+    "camera": {
+      "description": "La caméra qui suit un élément relevé, pour la scène HyperFrames en 1440x2560.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["follow", "scale"],
+      "properties": {
+        "follow": { "description": "Le nom de l'élément suivi, dans track.", "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "arriving": {
+          "description": "Le drapeau d'un élément qui arrive : la caméra part vers lui dès qu'il apparaît.",
+          "type": "string",
+          "pattern": "^data-[a-z0-9-]+$"
+        },
+        "scale": {
+          "description": "Pixels de l'image finale par pixel CSS de la fenêtre : l'action isolée à 1,6 à 2 fois sa taille.",
+          "type": "number",
+          "minimum": 1.6,
+          "maximum": 2
+        },
+        "move": { "description": "La durée d'un mouvement, en secondes.", "type": "number", "minimum": 0.4, "maximum": 0.6, "default": 0.5 },
+        "anchor": {
+          "description": "Où l'élément suivi se place dans le cadre, en fraction de sa largeur et de sa hauteur.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "default": { "x": 0.5, "y": 0.42 }
+        },
+        "dead_zone": {
+          "description": "En pixels CSS : la caméra ne repart que si sa cible s'est déplacée de plus que cela.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200,
+          "default": 24
+        },
+        "blur": {
+          "description": "Le flou de bougé par accumulation : copies de la couche caméra pendant les mouvements, étalées sur une fraction d'image.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["copies", "shutter"],
+          "properties": {
+            "copies": { "type": "integer", "minimum": 1, "maximum": 8 },
+            "shutter": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "default": { "copies": 6, "shutter": 0.5 }
+        },
+        "labels": {
+          "description": "Un titre par groupe de l'élément suivi (sa station, par exemple), tenu tant qu'il y est, dans la bande des sous-titres.",
+          "type": "object",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    }
+  }
+}
