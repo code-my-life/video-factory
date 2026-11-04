@@ -20,7 +20,7 @@ The template is the only place a new script comes from, so every script starts v
 ## If you change this
 
 - **Hits:** every video created afterwards (not the existing ones); `tests/test_new.py`, which checks the fields `vf new` writes.
-- **Does not hit:** the HyperFrames [composition template](composition-template.md) of `compose`.
+- **Does not hit:** the HyperFrames [project templates](hyperframes-templates.md) of `compose`.
 
 ## See
 

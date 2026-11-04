@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The « stat » shot of video-factory, from the registry block mk-progress-stat (hyperframes add, registry at
+      v0.9.12; the file as installed is in git history and its fingerprint in hyperframes.lock.json). Provisional
+      restyle until the video design system: full frame on black, white text, one font, a white track, the group
+      centred in the shot box of compose. The figure counts up when it starts with a whole number ("9 postes": 9
+      counts, "postes" is its label); otherwise it is shown as written. compose writes one copy per shot: ID prefixes
+      every id, DURATION is the shot length in seconds, CONFIG holds the figure, its caption and the box.
+    -->
+    <style>
+      @font-face {
+        font-family: "VF Provisoire";
+        src: url("assets/fonts/Inter-Bold.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
+      }
+      #{{ID}}-root {
+        --mk-font: "VF Provisoire", sans-serif;
+        --mk-ink: #ffffff;
+        --mk-ink-dim: #c8c8cc;
+        --mk-track: rgba(255, 255, 255, 0.25);
+        --mk-fill: #ffffff;
+
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: #000;
+      }
+      #{{ID}}-group {
+        position: absolute;
+        font-family: var(--mk-font);
+        text-align: center;
+      }
+      #{{ID}}-num {
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        color: var(--mk-ink);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      #{{ID}}-label {
+        margin-top: 16px;
+        font-weight: 700;
+        line-height: 1.15;
+        color: var(--mk-ink);
+      }
+      #{{ID}}-track {
+        position: relative;
+        margin: 40px auto 0;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--mk-track);
+        overflow: hidden;
+      }
+      #{{ID}}-fill {
+        position: absolute;
+        inset: 0;
+        border-radius: 4px;
+        background: var(--mk-fill);
+        transform-origin: left center;
+      }
+      #{{ID}}-caption {
+        margin-top: 36px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--mk-ink-dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="{{ID}}-root"
+      data-composition-id="{{ID}}"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-width="1440"
+      data-height="2560"
+    >
+      <div id="{{ID}}-group">
+        <div id="{{ID}}-num"></div>
+        <div id="{{ID}}-label"></div>
+        <div id="{{ID}}-track"><div id="{{ID}}-fill"></div></div>
+        <div id="{{ID}}-caption"></div>
+      </div>
+      <div
+        id="{{ID}}-drv"
+        class="clip"
+        data-start="0"
+        data-duration="{{DURATION}}"
+        data-track-index="0"
+        style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none"
+      ></div>
+    </div>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+
+        /* compose writes the value (a whole number, or null), the figure as written, its label, the caption, the box. */
+        var CONFIG = {{CONFIG}};
+
+        var ID = "{{ID}}";
+        var FONT = '"VF Provisoire"';
+        var group = document.getElementById(ID + "-group");
+        var num = document.getElementById(ID + "-num");
+        var measure = document.createElement("canvas").getContext("2d");
+        function fit(text, size, room) {
+          measure.font = "700 " + size + "px " + FONT;
+          var width = measure.measureText(text).width;
+          return width <= room ? size : Math.max(24, Math.floor((size * room) / width));
+        }
+        var room = CONFIG.box.width - 8;
+        var shown = CONFIG.value === null ? CONFIG.figure : String(CONFIG.value);
+        num.textContent = shown;
+        num.style.fontSize = fit(shown, 360, room) + "px";
+        var label = document.getElementById(ID + "-label");
+        label.textContent = CONFIG.label;
+        label.style.fontSize = fit(CONFIG.label, 96, room) + "px";
+        var caption = document.getElementById(ID + "-caption");
+        caption.textContent = CONFIG.caption;
+        caption.style.fontSize = "64px";
+        group.style.width = CONFIG.box.width + "px";
+        document.getElementById(ID + "-track").style.width = Math.round(CONFIG.box.width * 0.6) + "px";
+
+        /* The group, centred in the box (measured once, after its text is set). */
+        num.textContent = shown;
+        var rect = group.getBoundingClientRect();
+        if (CONFIG.value !== null) num.textContent = "0";
+        group.style.left = CONFIG.box.left + "px";
+        group.style.top = Math.round(CONFIG.box.top + (CONFIG.box.height - rect.height) / 2) + "px";
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(group, { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.1);
+        /* The count-up and the track on the same ease (the data-viz recipe of the block). */
+        if (CONFIG.value !== null) {
+          var st = { v: 0 };
+          tl.fromTo(
+            st,
+            { v: 0 },
+            {
+              v: CONFIG.value,
+              duration: 1.2,
+              ease: "power2.out",
+              onUpdate: function () {
+                num.textContent = String(Math.round(st.v));
+              },
+            },
+            0.2,
+          );
+        }
+        tl.fromTo(document.getElementById(ID + "-fill"), { scaleX: 0 }, { scaleX: 1, duration: 1.2, ease: "power2.out" }, 0.2);
+
+        window.__timelines[ID] = tl;
+      })();
+    </script>
+  </body>
+</html>

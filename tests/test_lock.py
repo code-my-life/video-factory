@@ -39,6 +39,24 @@ def test_the_lock_pins_the_tools_of_the_chain():
     } <= set(TOOLS)
 
 
+def test_gsap_is_the_copy_hyperframes_ships_taken_from_the_pinned_hyperframes_archive():
+    gsap, cli = TOOLS["gsap"], TOOLS["hyperframes"]
+    assert gsap["kind"] == "library"
+    assert (gsap["url"], gsap["sha256"]) == (cli["url"], cli["sha256"])
+    assert set(gsap["files"]) == {"gsap.min.js", "CustomEase.min.js", "MotionPathPlugin.min.js"}
+    for name, pinned in gsap["files"].items():
+        assert pinned["path"] == f"package/dist/vendor/npm/gsap@{gsap['version']}/dist/{name}"
+
+
+def test_each_library_a_scene_may_load_is_pinned_file_by_file():
+    libraries = {name: tool for name, tool in TOOLS.items() if tool["kind"] == "library"}
+    assert set(libraries) == {"gsap", "lottie-web", "dotlottie-web", "animejs", "three"}
+    assert TOOLS["animejs"]["version"].startswith("4.")
+    for tool in libraries.values():
+        assert tool["url"].startswith("https://registry.npmjs.org/")
+        assert all(len(pinned["sha256"]) == 64 for pinned in tool["files"].values())
+
+
 def test_whisper_cpp_is_pinned_by_its_tag_and_its_commit():
     tool = TOOLS["whisper.cpp"]
     assert tool["url"].endswith(f"/refs/tags/{tool['version']}.tar.gz")

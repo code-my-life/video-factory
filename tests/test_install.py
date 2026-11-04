@@ -207,3 +207,48 @@ def test_the_render_image_is_built_reproducibly_with_the_pinned_arguments():
     for key, value in tool["build_args"].items():
         assert f"{key}={value}" in command
     assert command[-1] == str(REPO_ROOT / "toolchain" / "hyperframes")
+
+
+def library_tool(archive: bytes, files: dict[str, tuple[str, bytes]]) -> dict:
+    return {
+        "name": "gsap",
+        "kind": "library",
+        "version": "3.15.0",
+        "url": "https://example.invalid/hyperframes.tgz",
+        "sha256": sha256_bytes(archive),
+        "install": "uv run vf doctor --install gsap",
+        "files": {name: {"path": path, "sha256": sha256_bytes(data)} for name, (path, data) in files.items()},
+    }
+
+
+def test_a_library_installs_only_its_named_files_each_checked(tmp_path):
+    archive = tar_bytes(
+        {"dist/vendor/gsap.min.js": b"gsap", "dist/vendor/CustomEase.min.js": b"ease", "dist/cli.js": b"cli"},
+        top="package",
+    )
+    tool = library_tool(
+        archive,
+        {
+            "gsap.min.js": ("package/dist/vendor/gsap.min.js", b"gsap"),
+            "CustomEase.min.js": ("package/dist/vendor/CustomEase.min.js", b"ease"),
+        },
+    )
+    install.install_tool(tool, {"tools": [tool]}, places(tmp_path), tmp_path, serve({tool["url"]: archive}))
+    folder = tmp_path / "tools" / "gsap" / "3.15.0"
+    assert sorted(path.name for path in folder.iterdir()) == ["CustomEase.min.js", "gsap.min.js"]
+    assert (folder / "gsap.min.js").read_bytes() == b"gsap"
+
+
+def test_a_library_file_with_another_sha256_is_refused_and_nothing_is_put_in_place(tmp_path):
+    archive = tar_bytes({"gsap.min.js": b"gsap 3.15.1"}, top="package")
+    tool = library_tool(archive, {"gsap.min.js": ("package/gsap.min.js", b"gsap 3.15.0")})
+    with pytest.raises(install.InstallError, match=r"gsap : gsap.min.js d'empreinte"):
+        install.install_tool(tool, {"tools": [tool]}, places(tmp_path), tmp_path, serve({tool["url"]: archive}))
+    assert not (tmp_path / "tools" / "gsap" / "3.15.0").exists()
+
+
+def test_a_library_file_missing_from_its_archive_is_refused(tmp_path):
+    archive = tar_bytes({"other.js": b"x"}, top="package")
+    tool = library_tool(archive, {"gsap.min.js": ("package/gsap.min.js", b"gsap")})
+    with pytest.raises(install.InstallError, match=r"package/gsap\.min\.js absent de l'archive"):
+        install.install_tool(tool, {"tools": [tool]}, places(tmp_path), tmp_path, serve({tool["url"]: archive}))

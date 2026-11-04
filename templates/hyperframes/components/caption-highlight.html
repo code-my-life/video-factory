@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The captions track of video-factory, from the registry component caption-highlight (hyperframes add, registry at
+      v0.9.12; the file as installed is in git history and its fingerprint in hyperframes.lock.json), mounted as the
+      one sub-composition of the captions track. Provisional restyle until the video design system: the words as the
+      script writes them (no upper case), one font, white on a dark scrim sized to the line, a soft white sweep behind
+      the word being said, the group in the caption band of compose. One group shows at a time: it opens on its first
+      word and closes before the next one (a hard kill after its exit). compose writes WORDS and GROUPS (seconds,
+      from the alignment), the band, and DURATION, the length of the video.
+    -->
+    <style>
+      @font-face {
+        font-family: "VF Provisoire";
+        src: url("assets/fonts/Inter-Bold.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
+      }
+      #captions-root {
+        pointer-events: none;
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: transparent;
+      }
+      #captions-container {
+        position: absolute;
+        pointer-events: none;
+      }
+      .captions-group {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+      }
+      .captions-line {
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: baseline;
+        gap: 4px 6px;
+        max-width: 100%;
+        padding: 10px 18px 14px;
+        border-radius: 18px;
+        background: rgba(0, 0, 0, 0.62);
+      }
+      .captions-word {
+        font-family: "VF Provisoire", sans-serif;
+        font-weight: 700;
+        color: #ffffff;
+        display: inline-block;
+        line-height: 1.15;
+        position: relative;
+        padding: 2px 10px 6px;
+      }
+      .captions-word-bg {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        opacity: 0;
+        transform-origin: 0% 50%;
+        z-index: 0;
+      }
+      .captions-word-text {
+        position: relative;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="captions-root"
+      data-composition-id="captions"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-width="1440"
+      data-height="2560"
+    >
+      <div id="captions-container"></div>
+    </div>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+
+        /* compose writes WORDS [{text, start, end}], GROUPS [{first, last, start, end}] and the BAND in pixels. */
+        var DATA = {{CONFIG}};
+        var WORDS = DATA.words;
+        var GROUPS = DATA.groups;
+        var BAND = DATA.band;
+        var FONT = '"VF Provisoire"';
+
+        var fitCtx = document.createElement("canvas").getContext("2d");
+        /* The largest size from base down to its 60 % (step 2) at which the group holds on one line. */
+        function fitFontSize(text, base, maxWidth) {
+          var size = base;
+          var minSize = Math.floor(base * 0.6);
+          while (size > minSize) {
+            fitCtx.font = "700 " + size + "px " + FONT;
+            if (fitCtx.measureText(text).width <= maxWidth) return size;
+            size -= 2;
+          }
+          return minSize;
+        }
+
+        var container = document.getElementById("captions-container");
+        container.style.left = BAND.left + "px";
+        container.style.top = BAND.top + "px";
+        container.style.width = BAND.width + "px";
+        container.style.height = BAND.height + "px";
+        var tl = gsap.timeline({ paused: true });
+
+        GROUPS.forEach(function (g, gi) {
+          var groupWords = WORDS.slice(g.first, g.last + 1);
+          var grp = document.createElement("div");
+          grp.className = "captions-group";
+          grp.id = "captions-grp-" + gi;
+          var line = document.createElement("div");
+          line.className = "captions-line";
+          grp.appendChild(line);
+
+          var text = groupWords
+            .map(function (w) {
+              return w.text;
+            })
+            .join(" ");
+          /* The room left by the scrim and word paddings. */
+          var size = fitFontSize(text, DATA.size, BAND.width - 36 - 20 * groupWords.length - 6 * groupWords.length);
+
+          groupWords.forEach(function (w, i) {
+            var wi = g.first + i;
+            var wordEl = document.createElement("span");
+            wordEl.className = "captions-word";
+            wordEl.id = "captions-w-" + wi;
+            wordEl.style.fontSize = size + "px";
+            var bgEl = document.createElement("span");
+            bgEl.className = "captions-word-bg";
+            bgEl.id = "captions-bg-" + wi;
+            var textEl = document.createElement("span");
+            textEl.className = "captions-word-text";
+            textEl.textContent = w.text;
+            wordEl.appendChild(bgEl);
+            wordEl.appendChild(textEl);
+            line.appendChild(wordEl);
+          });
+          container.appendChild(grp);
+
+          tl.set(grp, { visibility: "visible" }, g.start);
+          tl.fromTo(grp, { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "power2.out" }, g.start);
+          groupWords.forEach(function (w, i) {
+            var bgEl = document.getElementById("captions-bg-" + (g.first + i));
+            var off = Math.min(w.end, g.end - 0.1);
+            if (off <= w.start) return;
+            tl.fromTo(bgEl, { opacity: 0, scaleX: 0 }, { opacity: 1, scaleX: 1, duration: 0.12, ease: "power2.out" }, w.start);
+            tl.to(bgEl, { opacity: 0, duration: 0.08, ease: "power2.in" }, off);
+          });
+          tl.to(grp, { opacity: 0, duration: 0.08, ease: "power2.in" }, g.end - 0.08);
+          tl.set(grp, { opacity: 0, visibility: "hidden" }, g.end);
+        });
+
+        window.__timelines["captions"] = tl;
+      })();
+    </script>
+  </body>
+</html>

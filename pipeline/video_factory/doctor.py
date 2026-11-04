@@ -111,6 +111,23 @@ def check_file(tool: lockfile.Tool, home: Path) -> list[Problem]:
     return []
 
 
+def check_library(tool: lockfile.Tool, home: Path) -> list[Problem]:
+    """Each file of a library is present at its SHA-256, and nothing else is in its folder."""
+    name, fix = str(tool["name"]), str(tool["install"])
+    files = dict(tool["files"])
+    found = []
+    for file, pinned in files.items():
+        path = home / file
+        if not path.is_file():
+            found.append(Problem(name, f"{file} absent ({path})", fix))
+        elif (digest := sha256_file(path)) != pinned["sha256"]:
+            found.append(Problem(name, f"{file} : empreinte {short(digest)} au lieu de {short(pinned['sha256'])}", fix))
+    extra = sorted(path.name for path in home.iterdir() if path.name not in files) if home.is_dir() else []
+    if extra:
+        found.append(Problem(name, f"fichiers en trop dans {home} : {', '.join(extra)}", fix))
+    return found
+
+
 def read_stamp(path: Path) -> dict:
     try:
         stamp = json.loads(path.read_text(encoding="utf-8"))
@@ -257,6 +274,8 @@ def check_tool(
         return check_npm(tool, home, env, run, repo_root, user_home)
     if kind == "docker-build":
         return check_docker_build(tool, run, repo_root)
+    if kind == "library":
+        return check_library(tool, home)
     return check_docker_image(tool, run)
 
 

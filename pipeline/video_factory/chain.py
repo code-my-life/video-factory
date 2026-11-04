@@ -43,12 +43,15 @@ def modules(*names: str) -> tuple[str, ...]:
     return tuple(f"{PACKAGE}/{name}.py" for name in (*names, "steps"))
 
 
-TEMPLATE = (
-    "templates/composition/index.html",
-    "templates/composition/texte.html",
-    "templates/composition/vf-frames.js",
-    "templates/composition/assets/fonts/Inter-Bold.woff2",
+# The project templates and the registry items of compose: every file counts in its fingerprint.
+TEMPLATE = tuple(
+    sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in (REPO_ROOT / "templates" / "hyperframes").rglob("*")
+        if path.is_file()
+    )
 )
+LIBRARIES = ("gsap", "lottie-web", "dotlottie-web", "animejs", "three")
 STEPS = (
     Step(
         "ingest",
@@ -108,8 +111,8 @@ STEPS = (
     Step(
         "compose",
         ("blur", "cut"),
-        ("ffmpeg", "hyperframes-render"),
-        modules("compose", "music", "script", "cut", "media") + TEMPLATE,
+        ("ffmpeg", "hyperframes-render", *LIBRARIES),
+        modules("compose", "music", "script", "cut", "media", "tools") + TEMPLATE,
         steps.compose_inputs,
         steps.compose_params,
         steps.compose_run,

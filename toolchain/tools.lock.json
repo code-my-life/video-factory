@@ -3,7 +3,7 @@
   "lock_version": 1,
   "platform": "linux-x86_64",
   "not_pinned_yet": [
-    "Les polices du design system vidéo : elles arrivent avec son issue. Le gabarit provisoire de compose embarque une seule police, Inter Bold (OFL), figée dans le dépôt (templates/composition/assets/fonts/).",
+    "Les polices du design system vidéo : elles arrivent avec son issue. Le gabarit provisoire de compose embarque une seule police, Inter Bold (OFL), figée dans le dépôt (templates/hyperframes/assets/fonts/).",
     "Les paquets Python (LiteRT, numpy, jsonschema) ne sont pas ici : uv.lock les fige, par version et empreinte."
   ],
   "tools": [
@@ -168,6 +168,84 @@
         "FFMPEG_URL": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/ffmpeg-n8.0.1-66-g27b8d1a017-linux64-gpl-8.0.tar.xz",
         "FFMPEG_SHA256": "26d2ecd0cefba99f9d1ea92252a3a4f743a58df4c1c3cf9f8bbaaa40b1fca5b0",
         "SOURCE_DATE_EPOCH": "1793059200"
+      }
+    },
+    {
+      "name": "gsap",
+      "kind": "library",
+      "version": "3.15.0",
+      "about": "GSAP 3.15.0 tel que HyperFrames 0.9.12 l'embarque (cœur, CustomEase, MotionPathPlugin) : compose le copie dans chaque projet (assets/lib/gsap/), chaque scène le charge par un chemin local, sans CDN.",
+      "source": "npm, hyperframes@0.9.12 (la même archive que l'entrée hyperframes), dist/vendor/npm/gsap@3.15.0/dist",
+      "url": "https://registry.npmjs.org/hyperframes/-/hyperframes-0.9.12.tgz",
+      "sha256": "08250a3ad2f0fd5c153009d781e21e4d84e90ac5a65e3df6286c48bcd19ce89d",
+      "install": "uv run vf doctor --install gsap",
+      "license": "GSAP Standard License (https://gsap.com/standard-license), rappelée en tête de chaque fichier",
+      "files": {
+        "gsap.min.js": { "path": "package/dist/vendor/npm/gsap@3.15.0/dist/gsap.min.js", "sha256": "92bb9a96476f983d212a2bc4f54c889039c1696dd4461d40a736860938570fbb" },
+        "CustomEase.min.js": { "path": "package/dist/vendor/npm/gsap@3.15.0/dist/CustomEase.min.js", "sha256": "466e426a5c60c21c94b15a30a3dffacac9bb39ce8f4e07d071d7d4bb1be43390" },
+        "MotionPathPlugin.min.js": { "path": "package/dist/vendor/npm/gsap@3.15.0/dist/MotionPathPlugin.min.js", "sha256": "ace44a07c6c179f5347d9b46a152d468e4c9f272ee0d68bf0354e00d60000693" }
+      }
+    },
+    {
+      "name": "lottie-web",
+      "kind": "library",
+      "version": "5.13.0",
+      "about": "lottie-web 5.13.0 (lecteur Lottie, script classique, global lottie) : copié dans le projet (assets/lib/lottie-web/) par compose quand une scène le charge.",
+      "source": "npm, lottie-web@5.13.0, build/player/lottie.min.js",
+      "url": "https://registry.npmjs.org/lottie-web/-/lottie-web-5.13.0.tgz",
+      "sha256": "00f306a9b5669abf9622c418b549681d1b858e0b7fa7ea6adc0772ca57c3fd4f",
+      "install": "uv run vf doctor --install lottie-web",
+      "license": "MIT",
+      "files": {
+        "lottie.min.js": { "path": "package/build/player/lottie.min.js", "sha256": "2eb762973aec914d981f426123040bfac9d26217239605e225ddc7cee17618ac" },
+        "LICENSE.md": { "path": "package/LICENSE.md", "sha256": "9d8d4d8b4bb99572ee8b51025a30b8493d949798cac465c6c15b1b29420bcb06" }
+      }
+    },
+    {
+      "name": "dotlottie-web",
+      "kind": "library",
+      "version": "0.81.0",
+      "about": "@lottiefiles/dotlottie-web 0.81.0 (lecteur dotLottie, module ESM et son WASM) : copié dans le projet (assets/lib/dotlottie-web/) par compose quand une scène le charge.",
+      "source": "npm, @lottiefiles/dotlottie-web@0.81.0, dist/index.js et dist/dotlottie-player.wasm",
+      "url": "https://registry.npmjs.org/@lottiefiles/dotlottie-web/-/dotlottie-web-0.81.0.tgz",
+      "sha256": "ec2d9df8861eca02e6bdf043b7bf1c0408ced38a4dcabeae9d91a74019067c0c",
+      "install": "uv run vf doctor --install dotlottie-web",
+      "license": "MIT",
+      "files": {
+        "index.js": { "path": "package/dist/index.js", "sha256": "1e50bf80381a4fbaf4153d807bff0294c11574db3d62d6e0cf5b0872cba27803" },
+        "dotlottie-player.wasm": { "path": "package/dist/dotlottie-player.wasm", "sha256": "92822207905406eee4f0785e8d4a99a504a24db6f658abfaec074a9420471b25" },
+        "LICENSE": { "path": "package/LICENSE", "sha256": "779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8" }
+      }
+    },
+    {
+      "name": "animejs",
+      "kind": "library",
+      "version": "4.5.0",
+      "about": "anime.js 4.5.0 (script classique, global anime) : copié dans le projet (assets/lib/animejs/) par compose quand une scène le charge.",
+      "source": "npm, animejs@4.5.0, dist/bundles/anime.umd.min.js",
+      "url": "https://registry.npmjs.org/animejs/-/animejs-4.5.0.tgz",
+      "sha256": "f1bf4be22ae739bbfefd3ec3651a37a7d178dfa8ce782b0ebe5e39347fcb1706",
+      "install": "uv run vf doctor --install animejs",
+      "license": "MIT",
+      "files": {
+        "anime.umd.min.js": { "path": "package/dist/bundles/anime.umd.min.js", "sha256": "8d5b3a58a1f64023a04a4cedeef135a2263b18da04b35177ac13438a0bad033b" },
+        "LICENSE.md": { "path": "package/LICENSE.md", "sha256": "3f3e835a9952cfc2a6ca836fb95b3257c981f24fa3ef51249055acb09931897b" }
+      }
+    },
+    {
+      "name": "three",
+      "kind": "library",
+      "version": "0.186.1",
+      "about": "Three.js 0.186.1 (modules ESM, three.module.js importe three.core.js) : copié dans le projet (assets/lib/three/) par compose quand une scène le charge ; la scène dessine depuis hf-seek.",
+      "source": "npm, three@0.186.1, build/three.module.js et build/three.core.js",
+      "url": "https://registry.npmjs.org/three/-/three-0.186.1.tgz",
+      "sha256": "8cd068708ea44f2c73c944b1cead2ba2f0d5c15c8fc194e5700f4e4f4a033fe7",
+      "install": "uv run vf doctor --install three",
+      "license": "MIT",
+      "files": {
+        "three.module.js": { "path": "package/build/three.module.js", "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea" },
+        "three.core.js": { "path": "package/build/three.core.js", "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6" },
+        "LICENSE": { "path": "package/LICENSE", "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc" }
       }
     }
   ]

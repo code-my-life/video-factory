@@ -8,7 +8,7 @@ Ce dépôt est public et ne contient que le moteur : le code de la commande `vf`
 
 1. Un script approuvé, dans `video-content`.
 2. Le tournage à l'iPhone, le masque du robot appliqué.
-3. `vf ingest`, puis `scan` (aucun visage), `blur` (le fond), `transcribe`, `align`, `cut`, `voice`, `compose` (HyperFrames), `master` et `qc`.
+3. `vf ingest`, puis `scan` (aucun visage), `blur` (le fond), `transcribe`, `align`, `cut`, `voice`, `compose` (un vrai projet HyperFrames, vérifié par `hyperframes check`, rendu sans réseau), `master` et `qc`.
 4. La publication.
 
 Chaque étape inscrit dans l'état de la vidéo (`state.json`) l'empreinte de ses entrées et de ses sorties, la version de ses outils, ses paramètres et l'empreinte de son code : `vf status` dit ce qui est périmé, `vf run` ne refait que cela. Les mêmes entrées donnent le même master, image par image (`framemd5`). Le socle vient de [#2](https://github.com/code-my-life/video-factory/issues/2), la chaîne de [#4](https://github.com/code-my-life/video-factory/issues/4) ; son gabarit visuel est provisoire jusqu'au design system vidéo.
@@ -49,7 +49,7 @@ uv run vf run ma-video       # jusqu'au master et à son contrôle
 
 ## Les outils figés
 
-FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son image de rendu (construite sur la machine, chaque couche figée, au même digest à chaque construction), les modèles MediaPipe de détection de visage et de segmentation (lancés par LiteRT), et ce qu'il faut pour les installer (CMake, Node.js). Chacun est figé par sa version et son empreinte dans [toolchain/tools.lock.json](toolchain/tools.lock.json) ; les paquets Python le sont dans `uv.lock`. Le gabarit provisoire embarque une police, Inter Bold ; celles du design system arriveront avec lui.
+FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son image de rendu (construite sur la machine, chaque couche figée, au même digest à chaque construction), les modèles MediaPipe de détection de visage et de segmentation (lancés par LiteRT), les bibliothèques d'animation que les scènes chargent (GSAP tel que HyperFrames l'embarque, Lottie, dotLottie, anime.js, Three.js), et ce qu'il faut pour les installer (CMake, Node.js). Chacun est figé par sa version et son empreinte dans [toolchain/tools.lock.json](toolchain/tools.lock.json) ; les paquets Python le sont dans `uv.lock`. Le gabarit provisoire embarque une police, Inter Bold ; celles du design system arriveront avec lui.
 
 ## Pour aller plus loin
 
@@ -57,8 +57,10 @@ FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son i
 - [docs/RUNBOOK.md](docs/RUNBOOK.md) : l'installation, les variables, la montée de version d'un outil.
 - [docs/decisions/0001-chaine-du-monteur.md](docs/decisions/0001-chaine-du-monteur.md) : les décisions qui fondent la chaîne.
 - [docs/decisions/0002-chaine-de-derush-et-de-rendu.md](docs/decisions/0002-chaine-de-derush-et-de-rendu.md) : comment chaque étape est faite, et ce qui reste provisoire.
+- [docs/decisions/0003-projet-hyperframes-gsap-et-registre.md](docs/decisions/0003-projet-hyperframes-gsap-et-registre.md) : le vrai projet HyperFrames de `compose`, GSAP livré, le registre et les skills.
+- [.claude/skills/video-factory/SKILL.md](.claude/skills/video-factory/SKILL.md) : le skill des agents, du script annoté aux scènes.
 - [docs/map/AGENTS.md](docs/map/AGENTS.md) : la carte du dépôt (ICM, en anglais).
 
 ## Licence et crédits
 
-Le code est sous licence [MIT](LICENSE). Le modèle du robot et la police du gabarit sont crédités dans [CREDITS.md](CREDITS.md). Les outils figés gardent leur licence (FFmpeg en GPL pour le build statique de BtbN, whisper.cpp et son modèle en MIT, HyperFrames, LiteRT et les modèles MediaPipe en Apache 2.0) : aucun n'est redistribué ici, chacun se télécharge depuis sa source. Seule la police Inter Bold (SIL Open Font License 1.1) est dans le dépôt, avec sa licence.
+Le code est sous licence [MIT](LICENSE). Le modèle du robot et la police du gabarit sont crédités dans [CREDITS.md](CREDITS.md). Les outils figés gardent leur licence (FFmpeg en GPL pour le build statique de BtbN, whisper.cpp et son modèle en MIT, HyperFrames, LiteRT et les modèles MediaPipe en Apache 2.0, GSAP sous sa licence standard sans frais, Lottie, dotLottie, anime.js et Three.js en MIT) : aucun n'est redistribué ici, chacun se télécharge depuis sa source. Sont dans le dépôt, avec leur licence : la police Inter Bold (SIL Open Font License 1.1), trois éléments du registre de HyperFrames restylés et quatre de ses skills internes (Apache 2.0).

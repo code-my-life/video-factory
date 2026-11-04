@@ -30,6 +30,7 @@ from video_factory import (
     voice,
 )
 from video_factory.context import StepError, Video
+from video_factory.tools import ToolError
 
 
 @dataclass
@@ -266,9 +267,13 @@ def compose_params(video: Video) -> dict:
         "fps": compose.FPS,
         "safe": compose.SAFE,
         "caption": compose.CAPTION,
+        "caption_size": compose.CAPTION_SIZE,
+        "groups": {"words": compose.GROUP_WORDS, "pause": compose.GROUP_PAUSE},
         "shot": compose.SHOT,
+        "shot_sizes": compose.SHOT_SIZES,
         "workers": compose.WORKERS,
         "image": video.toolbox.entry("hyperframes-render")["sha256"],
+        "libraries": {name: video.toolbox.entry(name)["files"] for name in video.toolbox.libraries()},
         "music": {"seed": music.SEED, "tempo": music.TEMPO, "rms_dbfs": music.RMS_DBFS},
     }
 
@@ -295,18 +300,33 @@ def compose_run(video: Video, scratch: Path) -> Result:
     project, video_pass, text_pass, work = scratch / "project", scratch / "video", scratch / "texte", scratch / "work"
     for folder in (video_pass, text_pass, work):
         folder.mkdir()
-    compose.write_project(project, plan)
+    try:
+        compose.write_project(project, plan)
+        libraries = compose.ship_libraries(project, tools)
+    except (compose.ComposeError, ToolError) as exc:
+        raise StepError(str(exc)) from exc
     camera = project / "assets" / "camera.mp4"
     compose.camera_track(tools.ffmpeg, tools.ffprobe, video.output("blur", "video"), edl, camera)
     files = {name: video.media / registered[name]["file"] for name in used_captures(video)}
     compose.place_captures(tools.ffmpeg, project, plan, files)
+    outside = compose.outside_references(project) + [f"absent : {name}" for name in compose.missing_files(project)]
+    if outside:
+        raise StepError("le projet ne doit charger que ses propres fichiers :\n" + "\n".join(f"- {o}" for o in outside))
     image = render_image(video)
     environment = dict(tools.entry("hyperframes")["env"])
+    started = time.monotonic()
+    try:
+        report = compose.check_project(compose.check_command(image, environment, project, work))
+    except compose.ComposeError as exc:
+        raise StepError(str(exc)) from exc
+    checked = round(time.monotonic() - started, 1)
     rendering = {}
-    for name, entry, output in (("video", "index.html", video_pass), ("texte", "texte.html", text_pass)):
+    text_root = scratch / "texte.html"
+    compose.write_text_root(text_root, plan)
+    for name, root, output in (("video", None, video_pass), ("texte", text_root, text_pass)):
         started = time.monotonic()
         try:
-            media.run(compose.render_command(image, environment, project, output, entry, work), f"rendu {entry}")
+            media.run(compose.render_command(image, environment, project, output, work, root), f"rendu {name}")
         except media.MediaError as exc:
             raise StepError(str(exc)) from exc
         rendering[name] = round(time.monotonic() - started, 1)
@@ -317,7 +337,10 @@ def compose_run(video: Video, scratch: Path) -> Result:
     summary = {
         "frames": plan["frames"],
         "shots": len(plan["shots"]),
+        "caption_groups": len(plan["groups"]),
         "camera_share": round(plan["camera_frames"] / plan["frames"], 4),
+        "libraries": libraries,
+        "check": {"seconds": checked, "warnings": compose.check_warnings(report)},
         "render_seconds": rendering,
     }
     outputs = {

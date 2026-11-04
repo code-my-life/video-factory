@@ -9,17 +9,19 @@ hits:
   - pipeline/video_factory/lock.py
   - pipeline/video_factory/doctor.py
   - pipeline/video_factory/install.py
+  - pipeline/video_factory/tools.py
+  - pipeline/video_factory/compose.py
   - tests/test_lock.py
   - docs/RUNBOOK.md
 ---
 
 # tools lock
 
-`toolchain/tools.lock.json`: every external tool of the chain, pinned by exact version and SHA-256, with its download URL and its install command; its schema fixes the fields of each kind (archive, file, source build, npm, pulled Docker image, built Docker image).
+`toolchain/tools.lock.json`: every external tool of the chain, pinned by exact version and SHA-256, with its download URL and its install command; its schema fixes the fields of each kind (archive, file, source build, npm, pulled Docker image, built Docker image, library).
 
 ## Why this shape
 
-Determinism starts with the tools: the same inputs only give the same frames with the same FFmpeg, whisper.cpp, model and HyperFrames. Each hash was computed from the downloaded file, never copied. `not_pinned_yet` says what the lock does not hold (the design system's fonts, the Python packages pinned by `uv.lock`) rather than leaving it implied. The render image is a built entry: its build folder, arguments and resulting digests are all here.
+Determinism starts with the tools: the same inputs only give the same frames with the same FFmpeg, whisper.cpp, model and HyperFrames. Each hash was computed from the downloaded file, never copied. `not_pinned_yet` says what the lock does not hold (the design system's fonts, the Python packages pinned by `uv.lock`) rather than leaving it implied. The render image is a built entry: its build folder, arguments and resulting digests are all here. A library (GSAP, lottie-web, dotlottie-web, animejs, three) is a set of files taken from a verified npm archive, each with its own SHA-256; GSAP points at the HyperFrames archive itself, so it is the copy HyperFrames embeds, and compose copies a library into each project that loads it.
 
 ## If you change this
 

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Root of the text pass: the same scenes and captions without the take, and only their text, white on black, so
+      that every lit pixel of a frame is written text. compose measures its box frame by frame for the safe zone (qc).
+    -->
+    <script src="assets/lib/gsap/gsap.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root *,
+      #root *::before,
+      #root *::after {
+        background: transparent !important;
+        border-color: transparent !important;
+        outline-color: transparent !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        color: #fff !important;
+        -webkit-text-fill-color: #fff !important;
+      }
+      #root img,
+      #root video,
+      #root canvas,
+      #root svg {
+        opacity: 0 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-fps="30"
+      data-width="1440"
+      data-height="2560"
+    >
+{{HOSTS}}
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

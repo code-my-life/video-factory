@@ -43,6 +43,7 @@ Chaque outil vit dans `$VF_TOOLS/<outil>/<version>/` ; deux versions ne s'écras
 | `hyperframes` (npm) | La version et l'empreinte du paquet installé, le `package-lock.json` utilisé, `hyperframes --version`, et la télémétrie coupée dans `~/.hyperframes/config.json`. |
 | `hyperframes-render-base` (image Docker) | L'étiquette `node:22.23.4-bookworm-slim` pointe sur le digest figé. |
 | `hyperframes-render` (image construite) | Le dossier `toolchain/hyperframes/` a l'empreinte du lock, et l'image `vf-hyperframes-render:0.9.12-1` a le digest figé (son manifeste, ou sa configuration dans l'ancien magasin de Docker). |
+| `gsap`, `lottie-web`, `dotlottie-web`, `animejs`, `three` (bibliothèques) | Chaque fichier copié, à son empreinte SHA-256, et rien d'autre dans le dossier. L'installation télécharge l'archive npm, vérifie son empreinte, puis n'en extrait que les fichiers nommés, chacun vérifié. GSAP est pris dans l'archive de HyperFrames 0.9.12 elle-même (`dist/vendor/npm/gsap@3.15.0/dist`) : la copie qu'il embarque. |
 
 whisper.cpp est construit pour le CPU avec des options fixes (`GGML_NATIVE=OFF`, AVX2, FMA, F16C, BMI2), le même binaire quel que soit le processeur de la machine qui construit. HyperFrames s'installe par `npm ci --ignore-scripts` depuis `toolchain/hyperframes/package-lock.json`, une fois vérifié que ce fichier fige l'archive dont l'empreinte vient d'être contrôlée.
 
@@ -62,6 +63,27 @@ Sans `HYPERFRAMES_NO_UPDATE_CHECK=1`, une installation npm de HyperFrames se met
 - `toolchain/hyperframes/Dockerfile.render` fige chaque couche : la base par son digest, les paquets Debian de snapshot.debian.org au 27 octobre 2026 (la date de la base), chrome-headless-shell 152.0.7977.30 (la version que HyperFrames 0.9.12 gère lui-même), FFmpeg n8.0.1 (celui de son Dockerfile), HyperFrames par `npm ci` depuis `toolchain/hyperframes/package-lock.json`. Les arguments de construction sont dans le lock (`build_args`), le Dockerfile n'a aucune valeur par défaut.
 - `uv run vf doctor --install hyperframes-render` la construit (`docker buildx build`, sans attestation, horodatages réécrits à `SOURCE_DATE_EPOCH`, exportée en archive OCI puis chargée) et refuse une image d'un autre digest : la construction est reproductible, deux constructions sans cache donnent le même.
 - `compose` lance le conteneur lui-même : `docker run --rm --network none`, sous l'utilisateur courant, avec les variables de l'entrée `hyperframes` du lock, le projet monté en lecture seule, l'image désignée par son identifiant vérifié. Rien de lourd ne s'écrit dans le conteneur : ses fichiers temporaires vont dans un dossier du magasin monté sur `/vf-work`, et les images extraites de la vidéo dans le dossier du rendu (`--frames-cache-dir off`). Le disque des conteneurs est celui de Docker Desktop, sur le disque C: : les gigaoctets d'images d'un rendu le rempliraient, et Docker Desktop tomberait avec lui (c'est arrivé au deuxième essai de bout en bout, le 4 novembre 2026).
+
+### Le projet de `compose`
+
+`compose` écrit un vrai projet HyperFrames dans son dossier de travail, depuis `templates/hyperframes/` : `index.html` (la racine, 1440x2560, 30 images par seconde, la durée du montage, la prise dans un conteneur que les zooms agrandissent), une scène par plan du script sous `compositions/shot-<n>.html`, la piste de sous-titres `compositions/captions.html`, la police et les bibliothèques chargées par le projet, copiées depuis `VF_TOOLS` dans `assets/lib/` (GSAP toujours). Les plans `etapes` et `stat` et les sous-titres sont des blocs et un composant du registre de HyperFrames, installés comme source et restylés (voir ci-dessous). Puis, dans l'ordre :
+
+1. `compose` refuse un projet qui charge quoi que ce soit hors de lui-même (une adresse de CDN, une police en ligne, un fichier absent), en nommant chaque fichier ;
+2. `hyperframes check --json` tourne dans l'image figée, sans réseau ; une erreur arrête `compose` et la nomme (section, code, message, fichier). Les avertissements sont relevés dans le résumé de l'étape (`state.json`) ;
+3. deux rendus : la passe vidéo, puis la passe texte (`texte.html`, gardée hors du projet, montée par-dessus `index.html`).
+
+Le skill `video-factory` (`.claude/skills/video-factory/`) dit comment passer des annotations aux scènes, les zones sûres, le rendu sans réseau, les bibliothèques autorisées et leur livraison.
+
+### Le registre
+
+`hyperframes add` demande le réseau : il ne sert qu'au développement, jamais pendant un rendu. Dans `templates/hyperframes/`, avec le Node figé et les variables ci-dessus :
+
+```bash
+cd templates/hyperframes
+PATH="$VF_TOOLS/node/v22.23.4/bin:$PATH" "$VF_TOOLS/hyperframes/0.9.12/node_modules/.bin/hyperframes" add <nom> --no-clipboard --json
+```
+
+`hyperframes.json` fige le registre au tag v0.9.12 (commit `1ff4cefd`), celui du CLI figé ; `add` inscrit l'élément dans `hyperframes.json` et l'empreinte de chaque fichier écrit dans `hyperframes.lock.json`. Le fichier installé est commité tel quel, puis adapté dans un second commit (sans CDN ni police en ligne, identifiants préfixés, données de `compose`, style sobre et provisoire), pour que git garde la source d'origine.
 
 ## Une nouvelle vidéo
 
@@ -128,7 +150,7 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 
 ## Ce qui reste provisoire
 
-- Le gabarit de `compose` (`templates/composition/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres un mot à la fois. Il sera remplacé par le design system vidéo, après des maquettes validées.
+- Le style des gabarits de `compose` (`templates/hyperframes/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres par groupes de trois mots au plus sur un voile sombre. Les blocs du registre y sont restylés sobrement, sans charte : le style définitif viendra du design system vidéo, après des maquettes validées.
 - Le seuil du détecteur de visage, 0,5 (`faces.THRESHOLD`, à un seul endroit) : son calibrage sur des prises étiquetées appartient à #3.
 - Le recadrage de la voie `quicklook-screen` dans `mask/routes.json`, à vérifier contre les boutons de Quick Look sur une vraie prise (#3).
 - Le seuil de silence de `transcribe` (-40 dB), le lexique des hésitations (`align.FILLERS`), la couleur « casque » (`voice.HELMET`) : à régler sur les premières vraies prises.
@@ -144,7 +166,8 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 
 3. Pour HyperFrames : changer la version dans `toolchain/hyperframes/package.json`, refaire le `package-lock.json` avec le npm figé (`PATH="$VF_TOOLS/node/v22.23.4/bin:$PATH" npm install --package-lock-only --ignore-scripts --no-audit --no-fund` dans `toolchain/hyperframes/`), et calculer `tree_sha256` sur l'archive npm comme au point 2. Vérifier aussi la base du nouveau `Dockerfile.render`.
 4. Changer l'entrée de `toolchain/tools.lock.json` (version, adresse, `sha256`, `tree_sha256`, texte de version attendu), puis `uv run pytest`, `uv run vf doctor --install <outil>` et `uv run vf doctor`.
-5. Ouvrir une PR de type Maintenance. Pour HyperFrames, avec les empreintes de rendu comparées (#4).
+5. Pour une bibliothèque (`kind: library`) : calculer l'empreinte de l'archive npm et celle de chaque fichier extrait (`tar -xzf <archive> -O package/<chemin> | sha256sum`). Pour GSAP, reprendre l'archive de la nouvelle version de HyperFrames et le dossier `dist/vendor/npm/gsap@<version>/dist` qu'elle porte.
+6. Ouvrir une PR de type Maintenance. Pour HyperFrames, avec les empreintes de rendu comparées (#4).
 
 ## Le contrôle « Aucun contenu »
 
@@ -173,6 +196,7 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 | `installé depuis un autre toolchain/hyperframes/package-lock.json` | `uv run vf doctor --install hyperframes`. |
 | `dépôt de contenu … absent` | `git clone https://github.com/code-my-life/video-content.git ~/perso/video-content`, ou régler `VF_CONTENT`. |
 | `… est sur un disque Windows` | `export VF_MEDIA=~/studio/media`. |
+| `gsap : gsap.min.js : empreinte … au lieu de …` (ou une autre bibliothèque) | La copie installée a changé : `uv run vf doctor --install gsap`. |
 | `hyperframes-render : … ne correspond pas au lock` | `toolchain/hyperframes/` a changé : reconstruire l'image (`uv run vf doctor --install hyperframes-render` refusera l'ancien digest et affichera le nouveau), puis reporter `context_sha256`, `sha256` et `config_sha256` dans le lock, par PR. |
 
 | Message de `vf run` | Réparation |
@@ -181,6 +205,9 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 | `prise 1 : 1179x2556 au lieu de 1206x2622` | La prise ne vient pas de cette voie : `--voie`, ou une nouvelle voie dans `mask/routes.json`. |
 | `capture absente : « ligne »` | `uv run vf ingest <id> --capture ligne <fichier>`. |
 | `visage détecté de l'image … pendant le mot gardé « … »` | Le masque a lâché pendant une phrase gardée : la retourner, ou en garder une autre prise. |
+| `hyperframes check refuse le projet :` suivi des erreurs | Chaque ligne nomme la section (`lint`, `runtime`, `layout`, `contrast`…), le code de la règle et le fichier : corriger le gabarit de `templates/hyperframes/` (skill `video-factory`). |
+| `le projet ne doit charger que ses propres fichiers` | Un gabarit charge une adresse de CDN, une police en ligne ou un fichier absent : la ligne nomme le fichier et l'adresse. |
+| `bibliothèque hors du lock : …` | Une scène charge `assets/lib/<nom>/` sans entrée `library` au lock : l'ajouter, ou retirer le chargement. |
 | `qc refuse le master` | Chaque ligne nomme sa borne : durée, sonie, crête vraie, format, zone sûre, plans face caméra, visage (avec l'image et le temps). |
 
 Une construction de whisper.cpp qui échoue faute de compilateur demande `build-essential` (gcc, g++).

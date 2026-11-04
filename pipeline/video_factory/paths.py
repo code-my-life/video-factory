@@ -20,7 +20,7 @@ SCRIPT_SCHEMA = SCHEMAS_DIR / "script.schema.json"
 SCRIPT_TEMPLATE = REPO_ROOT / "templates" / "script.md"
 ROUTES_FILE = REPO_ROOT / "mask" / "routes.json"
 ROUTES_SCHEMA = SCHEMAS_DIR / "routes.schema.json"
-COMPOSITION_TEMPLATE = REPO_ROOT / "templates" / "composition"
+HYPERFRAMES_TEMPLATE = REPO_ROOT / "templates" / "hyperframes"
 
 CONTENT_VAR = "VF_CONTENT"
 MEDIA_VAR = "VF_MEDIA"
