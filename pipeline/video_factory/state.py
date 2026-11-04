@@ -1,4 +1,4 @@
-"""state.json of a video: read (a version 1 state is moved to version 2), checked against the schema, written whole.
+"""state.json of a video: read (an older state is moved to version 3), checked against the schema, written whole.
 
 Every write is validated first and goes through a temporary file renamed over the old one, so a state is never left
 half written and never breaks its published schema.
@@ -12,7 +12,7 @@ from pathlib import Path
 from video_factory import schemas
 from video_factory.paths import STATE_SCHEMA
 
-VERSION = 2
+VERSION = 3
 
 
 class StateError(Exception):
@@ -20,12 +20,21 @@ class StateError(Exception):
 
 
 def migrate(state: dict) -> dict:
-    """A version 1 state as version 2: version 1 had no step that a chain ever wrote, so only empty ones move."""
-    if state.get("schema_version") != 1:
+    """An older state as version 3.
+
+    Version 1 had no step that a chain ever wrote, so only empty ones move. Version 2 had a shooting route and the
+    `scan` and `blur` steps: they go, and the steps after them become stale through
+    their own fingerprints (inputs and code).
+    """
+    if state.get("schema_version") == 1:
+        if state.get("steps"):
+            raise StateError("état en version 1 avec des étapes : à refaire depuis vf new")
+        state = {**state, "schema_version": 2, "takes": [], "captures": {}, "steps": {}}
+    if state.get("schema_version") != 2:
         return state
-    if state.get("steps"):
-        raise StateError("état en version 1 avec des étapes : à refaire depuis vf new")
-    return {**state, "schema_version": VERSION, "takes": [], "captures": {}, "steps": {}}
+    moved = {key: value for key, value in state.items() if key != "route"}
+    steps = {name: record for name, record in state["steps"].items() if name not in ("scan", "blur")}
+    return moved | {"schema_version": VERSION, "steps": steps}
 
 
 def problems(state: dict) -> list[str]:

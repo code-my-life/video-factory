@@ -1,5 +1,5 @@
-"""ingest: the working copy of a take is cropped and set right by its route, at 30 frames per second, in BT.709 SDR,
-with the sound at 48 kHz, and without any metadata of the phone."""
+"""ingest: the working copy of a 9:16 take keeps its frame as delivered, at 30 frames per second, in BT.709 SDR, with
+the sound at 48 kHz, and without any metadata of the phone; a take that is not 9:16 is refused with its size."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ import numpy as np
 import pytest
 
 from conftest import ffmpeg
-from video_factory import ingest, media, routes
-from video_factory.paths import ROUTES_FILE
+from video_factory import ingest, media
 
 APPLE = [
     "-movflags",
@@ -34,17 +33,11 @@ APPLE = [
     "-metadata:s:a",
     "creation_time=2026-11-04T09:00:00Z",
 ]
-SMALL_ROUTE = {
-    "about": "test",
-    "source": {"width": 108, "height": 240},
-    "crop": {"x": 0, "y": 24, "width": 108, "height": 192},
-    "mirrored": True,
-}
 
 
-def screen_recording(box, path: Path, width: int, height: int, top: int, extra: list[str] = ()) -> Path:
-    """A recording like the iPhone's: interface bands (magenta) above and below a mirrored scene whose true left half is
-    blue and right half red, at 60 frames per second, with sound and the phone's metadata."""
+def recording(box, path: Path, width: int, height: int, top: int, extra: list[str] = ()) -> Path:
+    """A take like the iPhone's: magenta bands above and below a scene whose left half is red and right half blue, at
+    60 frames per second, with sound and the phone's metadata."""
     middle = height - 2 * top
     scene = (
         f"color=c=red:s={width // 2}x{middle}:r=60:d=1[l];color=c=blue:s={width // 2}x{middle}:r=60:d=1[r];"
@@ -104,11 +97,11 @@ def mean_colour(box, path: Path, crop: str) -> np.ndarray:
 @pytest.mark.acceptance("la copie de travail n'a plus aucune métadonnée de l'iPhone")
 def test_the_working_copy_carries_no_metadata_of_the_iphone(tools, tmp_path):
     box = tools("ffmpeg")
-    take = screen_recording(box, tmp_path / "IMG_0001.MOV", 108, 240, 24)
+    take = recording(box, tmp_path / "IMG_0001.MOV", 108, 192, 24)
     before = json.dumps(tags_of(box, take))
     assert "iPhone 16 Pro" in before and "ISO6709" in before
     work = tmp_path / "work.mkv"
-    ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], SMALL_ROUTE, work)
+    ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], work)
     probed = tags_of(box, work)
     tags = [probed["format"].get("tags", {}), *(stream.get("tags", {}) for stream in probed["streams"])]
     written = json.dumps(tags).lower()
@@ -124,26 +117,23 @@ def test_the_working_copy_carries_no_metadata_of_the_iphone(tools, tmp_path):
     assert all(set(stream.get("tags", {})) <= {"DURATION"} for stream in probed["streams"])
 
 
-@pytest.mark.acceptance("le recadrage d'une voie retire l'interface et remet l'image à l'endroit")
-def test_the_route_crop_removes_the_interface_and_sets_the_image_right(tools, tmp_path):
+@pytest.mark.acceptance("une prise en 9:16 garde son cadre")
+def test_a_9_16_take_keeps_its_frame(tools, tmp_path):
     box = tools("ffmpeg")
-    _name, route = routes.pick(routes.load(ROUTES_FILE), "quicklook-screen")
-    source, crop = route["source"], route["crop"]
-    take = screen_recording(box, tmp_path / "take.mov", source["width"], source["height"], crop["y"])
+    take = recording(box, tmp_path / "take.mov", 108, 192, 24)
     work = tmp_path / "work.mkv"
-    described = ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], route, work)
+    described = ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], work)
     out = described["work"]
-    assert (out["width"], out["height"], out["frame_rate"]) == (crop["width"], crop["height"], "30")
+    assert (out["width"], out["height"], out["frame_rate"]) == (108, 192, "30")
     assert (out["color_primaries"], out["color_transfer"], out["color_space"]) == ("bt709", "bt709", "bt709")
     assert out["audio"] == {"codec": "pcm_s24le", "sample_rate": 48000}
-    width, height = crop["width"], crop["height"]
-    left = mean_colour(box, work, f"crop={width // 2 - 8}:{height}:0:0")
-    right = mean_colour(box, work, f"crop={width // 2 - 8}:{height}:{width // 2 + 8}:0")
-    assert left[2] > 200 and left[0] < 40  # the true left, blue, is on the left again
-    assert right[0] > 200 and right[2] < 40
-    for band in (f"crop={width}:8:0:0", f"crop={width}:8:0:{height - 8}"):
+    left = mean_colour(box, work, "crop=46:120:0:36")
+    right = mean_colour(box, work, "crop=46:120:62:36")
+    assert left[0] > 200 and left[2] < 40  # neither mirrored: red stays on the left
+    assert right[2] > 200 and right[0] < 40
+    for band in ("crop=108:16:0:0", "crop=108:16:0:176"):
         top_or_bottom = mean_colour(box, work, band)
-        assert not (top_or_bottom[0] > 150 and top_or_bottom[2] > 150), "interface band left in the frame"
+        assert top_or_bottom[0] > 150 and top_or_bottom[2] > 150, "the delivered frame was cropped"
 
 
 def test_a_display_p3_take_and_an_hlg_take_come_out_in_bt709_sdr(tools, tmp_path):
@@ -153,7 +143,7 @@ def test_a_display_p3_take_and_an_hlg_take_come_out_in_bt709_sdr(tools, tmp_path
         ("hlg", "color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc", "yuv420p10le"),
     ):
         take = tmp_path / f"{name}.mov"
-        scene = f"color=c=0x30c060:s=108x240:r=60:d=1,format={pix_fmt},setparams={tags}:range=tv"
+        scene = f"color=c=0x30c060:s=108x192:r=60:d=1,format={pix_fmt},setparams={tags}:range=tv"
         ffmpeg(
             box,
             "-f",
@@ -175,37 +165,21 @@ def test_a_display_p3_take_and_an_hlg_take_come_out_in_bt709_sdr(tools, tmp_path
             take,
         )
         assert ingest.colour_filter(media.summary(media.probe(box.ffprobe, take))).startswith("zscale=")
-        out = ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], SMALL_ROUTE, tmp_path / f"{name}.mkv")["work"]
+        out = ingest.make_working_copy(box.ffmpeg, box.ffprobe, [take], tmp_path / f"{name}.mkv")["work"]
         assert (out["pix_fmt"], out["color_primaries"], out["color_transfer"]) == ("yuv420p", "bt709", "bt709")
 
 
-def test_a_take_of_another_size_or_without_sound_is_refused(tools, tmp_path):
+@pytest.mark.acceptance("une prise qui n'est pas en 9:16 est refusée avec ses dimensions")
+def test_a_take_that_is_not_9_16_is_refused_with_its_size(tools, tmp_path):
     box = tools("ffmpeg")
-    wrong = screen_recording(box, tmp_path / "wrong.mov", 120, 240, 24)
-    with pytest.raises(ingest.IngestError, match="120x240 au lieu de 108x240"):
-        ingest.make_working_copy(box.ffmpeg, box.ffprobe, [wrong], SMALL_ROUTE, tmp_path / "w.mkv")
+    wrong = recording(box, tmp_path / "wrong.mov", 120, 240, 24)
+    with pytest.raises(ingest.IngestError, match="prise 1 : 120x240, pas en 9:16"):
+        ingest.make_working_copy(box.ffmpeg, box.ffprobe, [wrong], tmp_path / "w.mkv")
+
+
+def test_a_take_without_sound_is_refused(tools, tmp_path):
+    box = tools("ffmpeg")
     mute = tmp_path / "mute.mov"
-    ffmpeg(box, "-f", "lavfi", "-i", "color=s=108x240:r=30:d=1", "-c:v", "libx264", mute)
+    ffmpeg(box, "-f", "lavfi", "-i", "color=s=108x192:r=30:d=1", "-c:v", "libx264", mute)
     with pytest.raises(ingest.IngestError, match="aucune piste son"):
-        ingest.make_working_copy(box.ffmpeg, box.ffprobe, [mute], SMALL_ROUTE, tmp_path / "m.mkv")
-
-
-def test_the_routes_file_matches_its_schema_and_its_rules():
-    loaded = routes.load(ROUTES_FILE)
-    name, route = routes.pick(loaded, None)
-    assert name == "quicklook-screen"
-    assert route["source"] == {"width": 1206, "height": 2622}
-    assert (route["crop"]["width"], route["crop"]["height"], route["mirrored"]) == (1206, 2144, True)
-    assert "vérifier" in route["provisional"]
-
-
-def test_a_route_whose_crop_leaves_its_source_or_is_not_9_16_is_refused():
-    broken = {
-        "routes_version": 1,
-        "default": "a",
-        "routes": {"a": SMALL_ROUTE | {"crop": {"x": 0, "y": 60, "width": 108, "height": 200}}},
-    }
-    assert routes.rule_problems(broken) == [
-        "a : la zone utile dépasse l'image source",
-        "a : la zone utile n'est pas en 9:16 (108x200)",
-    ]
+        ingest.make_working_copy(box.ffmpeg, box.ffprobe, [mute], tmp_path / "m.mkv")

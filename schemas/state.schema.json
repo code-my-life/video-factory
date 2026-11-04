@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/schemas/state.schema.json",
-  "title": "État d'une vidéo, version 2",
-  "description": "video-content/videos/<id>/state.json : l'empreinte du script, les prises et les captures versées par vf ingest, puis, pour chaque étape passée, l'empreinte de ses entrées et de ses sorties, la version de ses outils, ses paramètres et l'empreinte de son code. Écrit par vf et vérifié à chaque écriture. La version 1 (sans prise ni étape) se lit et se réécrit en version 2.",
+  "title": "État d'une vidéo, version 3",
+  "description": "video-content/videos/<id>/state.json : l'empreinte du script, les prises et les captures versées par vf ingest, puis, pour chaque étape passée, l'empreinte de ses entrées et de ses sorties, la version de ses outils, ses paramètres et l'empreinte de son code. Écrit par vf et vérifié à chaque écriture. Une version plus ancienne se lit et se réécrit en version 3 : la version 1 sans prise ni étape, la version 2 sans sa voie de tournage ni ses étapes scan et blur.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "id", "created_at", "script", "takes", "captures", "steps"],
   "properties": {
     "schema_version": {
       "description": "Version de ce schéma. Un changement incompatible crée la version suivante.",
-      "const": 2
+      "const": 3
     },
     "id": {
       "description": "Identifiant de la vidéo, égal au nom de son dossier.",
@@ -29,13 +29,8 @@
         "sha256": { "$ref": "#/$defs/sha256" }
       }
     },
-    "route": {
-      "description": "La voie de tournage des prises, une clé de mask/routes.json.",
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-    },
     "takes": {
-      "description": "Les prises, dans l'ordre où elles se suivent, telles que tournées, dans le magasin des médias.",
+      "description": "Les prises, dans l'ordre où elles se suivent, telles que livrées (propres et cadrées en 9:16), dans le magasin des médias.",
       "type": "array",
       "items": { "$ref": "#/$defs/media" }
     },
@@ -49,7 +44,7 @@
       "description": "Les étapes passées, par nom.",
       "type": "object",
       "propertyNames": {
-        "enum": ["ingest", "scan", "blur", "transcribe", "align", "cut", "voice", "compose", "master", "qc"]
+        "enum": ["ingest", "transcribe", "align", "cut", "voice", "compose", "master", "qc"]
       },
       "additionalProperties": { "$ref": "#/$defs/step" }
     }

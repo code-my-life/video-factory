@@ -10,7 +10,7 @@ hits:
 
 # tests
 
-The pytest suite: one file per module or step, and the no-content check (`test_no_content.py`); `conftest.py` builds throwaway git repositories and archives, gives the pinned tools (`tools` fixture) and draws synthetic media (a drawn face, textured frames). The acceptance tests of an issue carry its exact test name in `@pytest.mark.acceptance("…")`.
+The pytest suite: one file per module or step, and the no-content check (`test_no_content.py`); `conftest.py` builds throwaway git repositories and archives, gives the pinned tools (`tools` fixture) and draws synthetic media (coloured and textured frames). The acceptance tests of an issue carry its exact test name in `@pytest.mark.acceptance("…")`.
 
 ## Why this shape
 

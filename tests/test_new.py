@@ -33,7 +33,7 @@ def test_vf_new_creates_a_script_and_a_state_valid_against_the_published_schemas
     state = json.loads((folder / "state.json").read_text(encoding="utf-8"))
     assert schemas.problems(state, STATE_SCHEMA) == []
     assert state == {
-        "schema_version": 2,
+        "schema_version": 3,
         "id": "essai",
         "created_at": NOW,
         "script": {"path": "script.md", "sha256": sha256_file(folder / "script.md")},

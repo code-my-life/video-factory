@@ -35,7 +35,7 @@ def edl_of(text: str) -> tuple[scripts.Script, dict]:
     script = scripts.parse(text)
     said = [word.norm for word in script.words]
     words = [{"text": t, "start": 0.5 * k + 0.1, "end": 0.5 * k + 0.45} for k, t in enumerate(said)]
-    return script, cut.decide(align.align(words, script)["words"], [], 30.0)
+    return script, cut.decide(align.align(words, script)["words"], 30.0)
 
 
 CAPTURES = {"ligne": {"sha256": "ab" * 32, "file": f"{'ab' * 32}.png", "kind": "image", "source_sha256": "cd" * 32}}
@@ -225,7 +225,7 @@ def test_caption_groups_close_at_a_sentence_end_a_pause_or_three_words_and_never
     script = scripts.parse(SCRIPT)
     said = [word.norm for word in script.words]
     words = [{"text": t, "start": 0.4 * k + 0.1, "end": 0.4 * k + 0.45} for k, t in enumerate(said)]
-    edl = cut.decide(align.align(words, script)["words"], [], 30.0)
+    edl = cut.decide(align.align(words, script)["words"], 30.0)
     plan = compose.plan(edl, script, CAPTURES)
     words = [plan["words"][g["first"] : g["last"] + 1] for g in plan["groups"]]
     assert [[w["text"] for w in group] for group in words][:3] == [

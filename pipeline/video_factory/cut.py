@@ -1,9 +1,9 @@
-"""`cut`: the edit decision list of a video, from the aligned words and the frames where a face was found.
+"""`cut`: the edit decision list of a video, from the aligned words.
 
 The video keeps the words that are said once and for all: the kept words and the words outside the script, from the
 first kept word to the last. Between two of them, a pause longer than MAX_SILENCE, or one that held a filler or a
-retake, is brought down to KEPT_SILENCE (half of it after the first word, half before the next). The frames where `scan`
-found a face are removed. A cut never falls inside a kept word: the step refuses the list rather than cut one.
+retake, is brought down to KEPT_SILENCE (half of it after the first word, half before the next). A cut never falls
+inside a kept word: the step refuses the list rather than cut one.
 
 Times are seconds on the sample grid of the voice (48 kHz); a segment may start between two frames, and the video
 shows, at each output frame, the source frame on screen at that instant (`source_frames`).
@@ -76,18 +76,6 @@ def merge(intervals: Sequence[tuple[float, float]]) -> list[tuple[float, float]]
     return merged
 
 
-def face_problem(said: Sequence[dict], faces: Sequence[dict]) -> str | None:
-    for face in faces:
-        for word in said:
-            if face["start"] < word["end"] and face["end"] > word["start"]:
-                return (
-                    f"visage détecté de l'image {face['first_frame']} à l'image {face['last_frame']} "
-                    f"({seconds(face['start'])} à {seconds(face['end'])}), pendant le mot gardé « {word['text']} » "
-                    f"({seconds(word['start'])} à {seconds(word['end'])}) : la coupe tomberait dans ce mot"
-                )
-    return None
-
-
 def seconds(value: float) -> str:
     return f"{value:.2f} s".replace(".", ",")
 
@@ -136,16 +124,12 @@ def problems(segments: Sequence[dict], said: Sequence[dict]) -> list[str]:
     return found
 
 
-def decide(words: Sequence[dict], faces: Sequence[dict], duration: float) -> dict:
+def decide(words: Sequence[dict], duration: float) -> dict:
     """The decision list: kept source segments, their place in the output, and each said word in output time."""
     said = retained(words)
     half = KEPT_SILENCE / 2
     span = (max(0.0, said[0]["start"] - half), min(duration, said[-1]["end"] + half))
-    face_cuts = [(face["start"], face["end"]) for face in faces]
-    why = face_problem(said, faces)
-    if why:
-        raise CutError(why)
-    segments = segments_of(keep_intervals(span, [*pause_cuts(words, said), *face_cuts]))
+    segments = segments_of(keep_intervals(span, pause_cuts(words, said)))
     found = problems(segments, said)
     if found:
         raise CutError("\n".join(found))

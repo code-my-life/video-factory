@@ -2,14 +2,13 @@
 
 The map of this repository for an agent about to change it, in the ICM "System map" form adapted by code-my-life/hermes-software-factory#24. One card per module under `objects/<cluster>/`, real movements only under `processes/`. Each card declares the paths it covers (`paths`) and what moves when they change (`hits`) in its front matter. There is no hand-written index: the impact index is computed from those front matters by the shared checker of code-my-life/.github, which does not exist yet; until then, open the card whose `paths` cover the file you change.
 
-Covered roots: `pipeline/`, `templates/`, `.claude/skills/`, `toolchain/`, `schemas/`, `mask/`, `scripts/`, `tests/`, `.github/`, and the Python project files at the top (`pyproject.toml`, `uv.lock`, `.python-version`).
+Covered roots: `pipeline/`, `templates/`, `.claude/skills/`, `toolchain/`, `schemas/`, `scripts/`, `tests/`, `.github/`, and the Python project files at the top (`pyproject.toml`, `uv.lock`, `.python-version`).
 
 ## Clusters
 
-- `objects/pipeline/`: the `video_factory` package behind the `vf` command, one card per module (the ten steps, the chain that runs them, the store, the state).
+- `objects/pipeline/`: the `video_factory` package behind the `vf` command, one card per module (the eight steps, the chain that runs them, the store, the state).
 - `objects/toolchain/`: the lock of external tools, the npm lockfile of HyperFrames and the render image.
-- `objects/contracts/`: the schemas this repository publishes (state, script, routes).
-- `objects/mask/`: the shooting routes.
+- `objects/contracts/`: the schemas this repository publishes (state, script).
 - `objects/templates/`: the script template, the HyperFrames project templates of `compose` and the registry items restyled for it.
 - `objects/skills/`: the agent skills shipped with this repository (`video-factory` and four internal skills of HyperFrames).
 - `objects/barriers/`: what keeps content out and conventions in (no-content check, workflows, tests).
@@ -23,7 +22,6 @@ Covered roots: `pipeline/`, `templates/`, `.claude/skills/`, `toolchain/`, `sche
 - "registry": the HyperFrames registry of blocks and components (`hyperframes catalog`, `hyperframes add`), not a container or npm registry.
 - "state": `state.json` of a video in `video-content` (schema `schemas/state.schema.json`), not the install stamps `.vf-build.json` and `.vf-install.json` that `vf doctor --install` writes in the tools directory.
 - "template" (gabarit): `templates/script.md`, the script template, or `templates/hyperframes/`, the HyperFrames project templates of `compose` (provisional look); the design system will bring the final look.
-- "route" (voie): a way of filming the masked take, in `mask/routes.json`; not a URL route.
 - "capture": a still or clip of a real screen shown by `[capture: <name>]`, not a video capture of the take.
 - "frames": the PNG frames `compose` stores as a folder `<sha256>.frames/`, or the framemd5 files of `master`.
 - "doctor": `vf doctor` (this repository); `hyperframes doctor` is HyperFrames' own command and is never called.
@@ -32,12 +30,11 @@ Covered roots: `pipeline/`, `templates/`, `.claude/skills/`, `toolchain/`, `sche
 
 ## Universes
 
-- **live**: `vf doctor`, `vf doctor --install`, `vf new`, `vf ingest`, `vf status`, `vf run` and the ten steps, the lock and its schema, the render image, the three published schemas, `mask/routes.json`, the script template, the HyperFrames project templates and registry items, the agent skills, the no-content check, the CI and Conventions workflows.
+- **live**: `vf doctor`, `vf doctor --install`, `vf new`, `vf ingest`, `vf status`, `vf run` and the eight steps, the lock and its schema, the render image, the two published schemas, the script template, the HyperFrames project templates and registry items, the agent skills, the no-content check, the CI and Conventions workflows.
 - **leftover**: none.
 - **ghost** (named, not built; do not implement against these):
   - `design/`: the video design system, its tokens and fonts (design system issue, after the key frames are validated); it replaces the provisional look of the project templates;
-  - the rest of `mask/`: the robot helmet and its build scripts (#3);
-  - the calibration of the face threshold on labelled takes (#3).
+  - `mask/`: the robot helmet and its build scripts (#3).
 
 ## What points into this repository from outside
 

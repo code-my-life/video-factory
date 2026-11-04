@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from fractions import Fraction
 
-import numpy as np
 import pytest
 
-from conftest import drawn_face, write_video
-from video_factory import faces, qc, schemas
+from video_factory import qc, schemas
 from video_factory.paths import SCRIPT_SCHEMA
 
 GOOD = {
@@ -37,7 +35,6 @@ def facts(**changes) -> dict:
         "text": [[0, 2249, 300, 1450, 1100, 1600]],
         "camera_frames": 1000,
         "frames": 2250,
-        "faces": [],
     }
     return found | changes
 
@@ -49,21 +46,6 @@ def failed(found: dict) -> list[str]:
 def test_a_master_inside_every_bound_passes():
     assert failed(facts()) == []
     assert qc.report(qc.judge(facts()))["passed"] is True
-
-
-@pytest.mark.acceptance("un master où un visage est détecté échoue, avec le numéro de l'image")
-def test_a_master_where_a_face_is_detected_fails_with_the_frame_number(tools, tmp_path):
-    box = tools("ffmpeg", "mediapipe-face-detector")
-    rng = np.random.default_rng(4)
-    background = [(rng.random((256, 144, 3)) * 60 + 20).astype(np.uint8) for _ in range(40)]
-    frames = [drawn_face() if 20 <= index < 25 else picture for index, picture in enumerate(background)]
-    master = write_video(box, frames, tmp_path / "master.mp4")
-    detector = faces.Detector(box.model("mediapipe-face-detector"))
-    found = qc.detected_faces(box.ffmpeg, master, detector)
-    assert [face["frame"] for face in found] == [20, 21, 22, 23, 24]
-    messages = failed(facts(faces=found))
-    assert len(messages) == 1
-    assert messages[0].startswith("visage détecté : image 20 (0,67 s), image 21 (0,70 s)")
 
 
 @pytest.mark.acceptance("un texte hors de la zone sûre fait échouer le master")

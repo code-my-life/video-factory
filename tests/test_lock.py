@@ -34,9 +34,8 @@ def test_the_lock_pins_the_tools_of_the_chain():
         "whisper-large-v3-turbo",
         "hyperframes",
         "hyperframes-render-base",
-        "mediapipe-face-detector",
-        "mediapipe-selfie-segmenter",
     } <= set(TOOLS)
+    assert not {"mediapipe-face-detector", "mediapipe-selfie-segmenter"} & set(TOOLS)
 
 
 def test_gsap_is_the_copy_hyperframes_ships_taken_from_the_pinned_hyperframes_archive():

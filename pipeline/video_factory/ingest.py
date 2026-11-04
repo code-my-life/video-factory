@@ -1,7 +1,8 @@
-"""`ingest`: the working copy of a video, made from its takes and its shooting route.
+"""`ingest`: the working copy of a video, made from its takes, each delivered clean and already framed in 9:16.
 
-For each take, in order: the route's 9:16 crop (the phone's interface removed), the mirror undone, 30 frames per second
-at a constant rate, the colours brought to BT.709 SDR, the sound at 48 kHz mono. Several takes are joined end to end.
+For each take, in order: its frame kept as delivered (a take that is not 9:16 is refused, with its size), 30 frames
+per second at a constant rate, the colours brought to BT.709 SDR, the sound at 48 kHz mono. No other treatment of the
+image: the takes come clean and framed. Several takes are joined end to end.
 The working copy carries no metadata of the phone (no place, no device, no date): only the video and audio streams are
 mapped, metadata and chapters are dropped, and the muxer and encoders write no version string.
 
@@ -30,7 +31,7 @@ TONE_MAP = "tonemap=tonemap=hable:desat=0"
 
 
 class IngestError(Exception):
-    """A take does not fit the route, or has no sound."""
+    """A take is not 9:16, or has no sound."""
 
 
 def display_size(summary: dict) -> tuple[int, int]:
@@ -58,13 +59,10 @@ def colour_filter(summary: dict) -> str:
     return f"zscale={source}:p=bt709:t=bt709:m=bt709:r=tv"
 
 
-def take_filters(index: int, summary: dict, route: dict) -> str:
+def take_filters(index: int, summary: dict) -> str:
     """The video and audio filter chains of one take, labelled [v<index>] and [a<index>]."""
-    crop = route["crop"]
     video = [
         "fps=30",
-        f"crop={crop['width']}:{crop['height']}:{crop['x']}:{crop['y']}",
-        *(["hflip"] if route["mirrored"] else []),
         colour_filter(summary),
         "format=yuv420p",
         media.BT709,
@@ -80,23 +78,20 @@ def take_filters(index: int, summary: dict, route: dict) -> str:
     return f"[{index}:v:0]{','.join(video)}[v{index}];[{index}:a:0]{','.join(audio)}[a{index}]"
 
 
-def check_take(name: str, summary: dict, route: dict) -> None:
+def check_take(name: str, summary: dict) -> None:
     width, height = display_size(summary)
-    expected = route["source"]
-    if (width, height) != (expected["width"], expected["height"]):
-        raise IngestError(
-            f"{name} : {width}x{height} au lieu de {expected['width']}x{expected['height']}, la taille de la voie"
-        )
+    if width * 16 != height * 9:
+        raise IngestError(f"{name} : {width}x{height}, pas en 9:16 ; recadrer la prise avant de la verser")
     if summary["audio"] is None:
         raise IngestError(f"{name} : aucune piste son, la voix manque")
 
 
-def command(takes: list[Path], summaries: list[dict], route: dict, output: Path) -> list[str | Path]:
+def command(takes: list[Path], summaries: list[dict], output: Path) -> list[str | Path]:
     """The ffmpeg arguments that make the working copy (Matroska: H.264 and 24-bit PCM)."""
     inputs: list[str | Path] = []
     for take in takes:
         inputs += ["-i", take]
-    graph = ";".join(take_filters(index, summary, route) for index, summary in enumerate(summaries))
+    graph = ";".join(take_filters(index, summary) for index, summary in enumerate(summaries))
     pairs = "".join(f"[v{index}][a{index}]" for index in range(len(takes)))
     graph += f";{pairs}concat=n={len(takes)}:v=1:a=1[v][a]"
     return [
@@ -139,10 +134,10 @@ def command(takes: list[Path], summaries: list[dict], route: dict, output: Path)
     ]
 
 
-def make_working_copy(ffmpeg: Path, ffprobe: Path, takes: list[Path], route: dict, output: Path) -> dict:
+def make_working_copy(ffmpeg: Path, ffprobe: Path, takes: list[Path], output: Path) -> dict:
     """Write the working copy of takes to output; return what was read of each take and of the result."""
     summaries = [media.summary(media.probe(ffprobe, take)) for take in takes]
     for number, summary in enumerate(summaries, 1):
-        check_take(f"prise {number}", summary, route)
-    media.ffmpeg(ffmpeg, command(takes, summaries, route, output), "ingest")
+        check_take(f"prise {number}", summary)
+    media.ffmpeg(ffmpeg, command(takes, summaries, output), "ingest")
     return {"takes": summaries, "work": media.summary(media.probe(ffprobe, output))}

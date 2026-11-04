@@ -13,7 +13,7 @@ hits:
 
 # state schema
 
-`schemas/state.schema.json`, version 2: the state of a video in `video-content` (`videos/<id>/state.json`): its id, its creation date, the fingerprint of its script, its takes, route and captures, and for each step passed the fingerprints of its inputs, its outputs as references to the media store, the versions of its tools, its parameters, the fingerprint of its code, a summary, its times and its duration. An empty version 1 state is read as version 2.
+`schemas/state.schema.json`, version 3: the state of a video in `video-content` (`videos/<id>/state.json`): its id, its creation date, the fingerprint of its script, its takes and captures, and for each step passed the fingerprints of its inputs, its outputs as references to the media store, the versions of its tools, its parameters, the fingerprint of its code, a summary, its times and its duration. An empty version 1 state, and a version 2 state without its route and its `scan` and `blur` steps, are read as version 3.
 
 ## Why this shape
 

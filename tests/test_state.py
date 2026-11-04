@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from video_factory import chain, faces, lock, state, store, videos
+from video_factory import chain, lock, state, store, transcribe, videos
 from video_factory.context import Video
 from video_factory.hashing import sha256_bytes
 from video_factory.paths import LOCK_FILE, SCRIPT_TEMPLATE, Places
@@ -18,8 +18,6 @@ from video_factory.tools import Toolbox
 SCRIPT = SCRIPT_TEMPLATE.read_text(encoding="utf-8").replace("{{id}}", "essai") + "Le code est simple.\n"
 OUTPUTS = {
     "ingest": {"work": "mkv", "probe": "json"},
-    "scan": {"faces": "json"},
-    "blur": {"video": "mkv", "mask": "mkv"},
     "transcribe": {"transcript": "json"},
     "align": {"alignment": "json"},
     "cut": {"edl": "json"},
@@ -87,7 +85,7 @@ def test_a_changed_input_makes_its_step_and_the_steps_after_it_stale(video):
     assert found["compose"].label == chain.STALE
     for name in ("cut", "voice", "master", "qc"):
         assert found[name].label == chain.WAITING
-    for name in ("ingest", "scan", "blur", "transcribe"):
+    for name in ("ingest", "transcribe"):
         assert found[name].label == chain.UP_TO_DATE
     # vf run redoes those steps and no other, as state.json records.
     before = finished(video)
@@ -95,7 +93,7 @@ def test_a_changed_input_makes_its_step_and_the_steps_after_it_stale(video):
     assert ran == ["align", "cut", "voice", "compose", "master", "qc"]
     after = finished(video)
     assert {name for name in after if after[name] != before[name]} <= set(ran)
-    assert all(after[name] == before[name] for name in ("ingest", "scan", "blur", "transcribe"))
+    assert all(after[name] == before[name] for name in ("ingest", "transcribe"))
     assert set(labels(video).values()) == {chain.UP_TO_DATE}
     assert state.problems(json.loads((video.folder / "state.json").read_text(encoding="utf-8"))) == []
 
@@ -103,13 +101,12 @@ def test_a_changed_input_makes_its_step_and_the_steps_after_it_stale(video):
 def test_a_changed_parameter_redoes_the_steps_that_use_it_and_not_the_steps_whose_inputs_stay_the_same(
     video, monkeypatch
 ):
-    monkeypatch.setattr(faces, "THRESHOLD", 0.7)
+    monkeypatch.setattr(transcribe, "BEAM", transcribe.BEAM + 1)
     found = {status.step: status for status in chain.status(video)}
-    assert found["scan"].reasons == ("paramètres modifiés",)
-    assert found["qc"].reasons == ("paramètres modifiés",)
-    assert found["cut"].label == chain.WAITING
-    # scan gives the same output again, so cut and the steps after it are not redone; qc reads the threshold too.
-    assert chain.run(video, say=lambda _line: None) == ["scan", "qc"]
+    assert found["transcribe"].reasons == ("paramètres modifiés",)
+    assert found["align"].label == chain.WAITING
+    # transcribe gives the same output again, so align and the steps after it are not redone.
+    assert chain.run(video, say=lambda _line: None) == ["transcribe"]
 
 
 def test_a_missing_output_makes_its_step_stale(video):
@@ -121,7 +118,7 @@ def test_a_missing_output_makes_its_step_stale(video):
     assert found["voice"].reasons == (f"{media['file']} absent du magasin",)
 
 
-def test_a_version_1_state_without_steps_moves_to_version_2(tmp_path):
+def test_a_version_1_state_without_steps_moves_to_version_3(tmp_path):
     old = {
         "schema_version": 1,
         "id": "essai",
@@ -131,10 +128,25 @@ def test_a_version_1_state_without_steps_moves_to_version_2(tmp_path):
     }
     path = tmp_path / "state.json"
     path.write_text(json.dumps(old), encoding="utf-8")
-    assert state.load(path) == old | {"schema_version": 2, "takes": [], "captures": {}}
+    assert state.load(path) == old | {"schema_version": 3, "takes": [], "captures": {}}
     path.write_text(json.dumps(old | {"steps": {"ingest": {}}}), encoding="utf-8")
     with pytest.raises(state.StateError, match="version 1 avec des étapes"):
         state.load(path)
+
+
+def test_a_version_2_state_loses_its_route_and_its_scan_and_blur_steps(video):
+    record = video.state["steps"]["ingest"]
+    old = video.state | {
+        "schema_version": 2,
+        "route": "quicklook-screen",
+        "steps": {"ingest": record, "scan": record, "blur": record},
+    }
+    path = video.folder / "state.json"
+    path.write_text(json.dumps(old), encoding="utf-8")
+    loaded = state.load(path)
+    assert loaded["schema_version"] == 3
+    assert "route" not in loaded
+    assert loaded["steps"] == {"ingest": record}
 
 
 def test_a_state_that_breaks_its_schema_is_never_written(tmp_path):

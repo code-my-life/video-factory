@@ -10,9 +10,9 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from video_factory import routes, state, store
+from video_factory import state, store
 from video_factory.hashing import sha256_file
-from video_factory.paths import ROUTES_FILE, Places
+from video_factory.paths import Places
 from video_factory.tools import Toolbox
 from video_factory.videos import SCRIPT_NAME, STATE_NAME
 
@@ -28,7 +28,6 @@ class Video:
     state: dict
     places: Places
     toolbox: Toolbox
-    routes_file: Path = ROUTES_FILE
     cache: dict = field(default_factory=dict)
 
     @classmethod
@@ -55,13 +54,6 @@ class Video:
 
     def script_sha256(self) -> str:
         return sha256_file(self.script_path)
-
-    def route(self) -> tuple[str, dict]:
-        try:
-            loaded = routes.load(self.routes_file)
-            return routes.pick(loaded, self.state.get("route"))
-        except routes.RouteError as exc:
-            raise StepError(str(exc)) from exc
 
     def record(self, step: str) -> dict:
         found = self.state["steps"].get(step)

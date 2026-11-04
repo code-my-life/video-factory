@@ -76,28 +76,6 @@
       "file": "ggml-large-v3-turbo.bin"
     },
     {
-      "name": "mediapipe-face-detector",
-      "kind": "file",
-      "version": "float16-1",
-      "about": "Détecteur de visage MediaPipe BlazeFace courte portée (Apache 2.0) : scan et qc, aucune image de visage ne sort.",
-      "source": "MediaPipe, face_detector/blaze_face_short_range/float16/1",
-      "url": "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-      "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
-      "install": "uv run vf doctor --install mediapipe-face-detector",
-      "file": "blaze_face_short_range.tflite"
-    },
-    {
-      "name": "mediapipe-selfie-segmenter",
-      "kind": "file",
-      "version": "float16-1",
-      "about": "Segmentation de la personne MediaPipe Selfie Segmenter (Apache 2.0) : blur, le fond flouté.",
-      "source": "MediaPipe, image_segmenter/selfie_segmenter/float16/1",
-      "url": "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite",
-      "sha256": "191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b",
-      "install": "uv run vf doctor --install mediapipe-selfie-segmenter",
-      "file": "selfie_segmenter.tflite"
-    },
-    {
       "name": "node",
       "kind": "archive",
       "version": "v22.23.4",

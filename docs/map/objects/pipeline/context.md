@@ -11,7 +11,7 @@ hits:
 
 # context
 
-The video a step works on (`Video`): its folder, state, script, the store, the toolbox and the route; steps read earlier outputs through it, checked to be in the store.
+The video a step works on (`Video`): its folder, state, script, the store, the toolbox; steps read earlier outputs through it, checked to be in the store.
 
 ## Why this shape
 

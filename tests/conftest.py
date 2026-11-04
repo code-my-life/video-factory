@@ -99,27 +99,6 @@ def ffmpeg(box, *args: str | Path) -> None:
     subprocess.run([str(box.ffmpeg), *quiet, *map(str, args)], check=True)
 
 
-def ellipse(image: np.ndarray, centre: tuple[float, float], radii: tuple[float, float], colour) -> None:
-    rows, cols = np.ogrid[: image.shape[0], : image.shape[1]]
-    inside = ((rows - centre[0]) / radii[0]) ** 2 + ((cols - centre[1]) / radii[1]) ** 2 <= 1
-    image[inside] = colour
-
-
-def drawn_face(height: int = 256, width: int = 144) -> np.ndarray:
-    """A face drawn with ellipses (hair, skin, eyes, brows, nose, mouth), which the face detector takes for one."""
-    image = np.full((height, width, 3), (70, 90, 110), np.uint8)
-    middle, top = width / 2, height * 0.35
-    ellipse(image, (top - 8, middle), (42, 36), (60, 40, 30))
-    ellipse(image, (top, middle), (38, 30), (224, 172, 140))
-    for side in (-12, 12):
-        ellipse(image, (top - 6, middle + side), (5, 8), (255, 255, 255))
-        ellipse(image, (top - 6, middle + side), (4, 4), (40, 30, 30))
-        ellipse(image, (top - 16, middle + side), (2.5, 9), (70, 50, 40))
-    ellipse(image, (top + 6, middle), (8, 4), (200, 140, 110))
-    ellipse(image, (top + 20, middle), (4, 12), (150, 60, 60))
-    return image
-
-
 def write_video(box, frames: list[np.ndarray], path: Path, fps: int = 30) -> Path:
     """Encode RGB frames losslessly enough (x264 at CRF 1) into path with the pinned ffmpeg."""
     height, width = frames[0].shape[:2]

@@ -13,7 +13,7 @@ hits:
 
 # compose
 
-`compose`: the plan (shots in output frames, captions and their groups, punch-ins, face-camera share; a capture not registered stops here, named), the camera track cut from the blurred video, the HyperFrames project (one root, one scene per shot, one captions track, the pinned libraries it loads copied from the lock), the guard against any URL outside the project, `hyperframes check --json` in the pinned image (an error stops compose), the `docker run --network none` render commands of both passes, the frame-count check, and the text boxes read from the text pass.
+`compose`: the plan (shots in output frames, captions and their groups, punch-ins, face-camera share; a capture not registered stops here, named), the camera track cut from the working copy of `ingest`, as delivered, the HyperFrames project (one root, one scene per shot, one captions track, the pinned libraries it loads copied from the lock), the guard against any URL outside the project, `hyperframes check --json` in the pinned image (an error stops compose), the `docker run --network none` render commands of both passes, the frame-count check, and the text boxes read from the text pass.
 
 ## Why this shape
 

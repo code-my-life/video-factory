@@ -13,7 +13,7 @@ hits:
 
 # Python project
 
-`pyproject.toml`, `uv.lock` and `.python-version`: Python 3.12, the package `video_factory` from `pipeline/` (uv_build backend), the console script `vf`, the exact versions of `ai-edge-litert` (the LiteRT runtime of the MediaPipe models), `numpy`, `jsonschema`, `pytest` and `ruff`, and the ruff and pytest settings (with the `acceptance` marker).
+`pyproject.toml`, `uv.lock` and `.python-version`: Python 3.12, the package `video_factory` from `pipeline/` (uv_build backend), the console script `vf`, the exact versions of `numpy`, `jsonschema`, `pytest` and `ruff`, and the ruff and pytest settings (with the `acceptance` marker).
 
 ## Why this shape
 

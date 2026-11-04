@@ -38,7 +38,7 @@ Chaque outil vit dans `$VF_TOOLS/<outil>/<version>/` ; deux versions ne s'écras
 | Outil | Ce que `vf doctor` vérifie |
 | --- | --- |
 | `ffmpeg`, `cmake`, `node` (archives) | L'empreinte de l'arbre extrait (`tree_sha256` : chaque fichier et chaque lien, ni dates ni droits) et la version que l'outil affiche. |
-| `whisper-large-v3-turbo`, `mediapipe-face-detector`, `mediapipe-selfie-segmenter` (fichiers) | L'empreinte SHA-256 du fichier, qui fixe aussi sa version. |
+| `whisper-large-v3-turbo` (fichier) | L'empreinte SHA-256 du fichier, qui fixe aussi sa version. |
 | `whisper.cpp` (construit depuis ses sources) | L'archive du tag, vérifiée par son empreinte et par le commit qu'elle porte avant la construction ; `.vf-build.json` garde la source, les options de CMake et l'empreinte du binaire ; `whisper-cli --version`. |
 | `hyperframes` (npm) | La version et l'empreinte du paquet installé, le `package-lock.json` utilisé, `hyperframes --version`, et la télémétrie coupée dans `~/.hyperframes/config.json`. |
 | `hyperframes-render-base` (image Docker) | L'étiquette `node:22.23.4-bookworm-slim` pointe sur le digest figé. |
@@ -115,7 +115,7 @@ Un plan noté en fin de ligne couvre toute la phrase ; noté dans la ligne, il c
 
 ```bash
 uv run vf ingest ma-video --capture ligne ~/captures/ligne.png    # une fois par capture que le script appelle
-uv run vf ingest ma-video ~/prises/IMG_0001.MOV                   # les prises, dans l'ordre ; --voie <voie> au besoin
+uv run vf ingest ma-video ~/prises/IMG_0001.MOV                   # les prises, dans l'ordre, propres et cadrées en 9:16
 uv run vf run ma-video
 uv run vf status ma-video
 ```
@@ -127,14 +127,12 @@ uv run vf status ma-video
 
 | Étape | Lit | Écrit |
 | --- | --- | --- |
-| `ingest` | les prises, la voie | la copie de travail (MKV : H.264, PCM 24 bits), sa description |
-| `scan` | la copie de travail | les images avec un visage et les plages à retirer (JSON, sans image) |
-| `blur` | la copie de travail | la vidéo au fond flou (sans perte), le masque de la personne ; la netteté relevée (C6) |
+| `ingest` | les prises | la copie de travail (MKV : H.264, PCM 24 bits), au cadre de la prise, sa description |
 | `transcribe` | la copie de travail | les mots, leurs temps, les silences |
 | `align` | les mots, `script.md` | chaque mot gardé, reprise, hésitation ou hors script |
-| `cut` | l'alignement, les visages | la liste de décision de montage |
+| `cut` | l'alignement | la liste de décision de montage |
 | `voice` | la copie de travail, la liste | la voix à -14 LUFS (WAV) |
-| `compose` | la vidéo floue, la liste, `script.md`, les captures | les images (PNG), le fond musical, le plan, les boîtes de texte |
+| `compose` | la copie de travail, la liste, `script.md`, les captures | les images (PNG), le fond musical, le plan, les boîtes de texte |
 | `master` | les images, la voix, la musique | le master 1440x2560, l'export TikTok 1080x1920, leurs `framemd5` |
 | `qc` | le master, l'export, le plan, les boîtes de texte | le rapport de contrôle |
 
@@ -151,8 +149,6 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 ## Ce qui reste provisoire
 
 - Le style des gabarits de `compose` (`templates/hyperframes/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres par groupes de trois mots au plus sur un voile sombre. Les blocs du registre y sont restylés sobrement, sans charte : le style définitif viendra du design system vidéo, après des maquettes validées.
-- Le seuil du détecteur de visage, 0,5 (`faces.THRESHOLD`, à un seul endroit) : son calibrage sur des prises étiquetées appartient à #3.
-- Le recadrage de la voie `quicklook-screen` dans `mask/routes.json`, à vérifier contre les boutons de Quick Look sur une vraie prise (#3).
 - Le seuil de silence de `transcribe` (-40 dB), le lexique des hésitations (`align.FILLERS`), la couleur « casque » (`voice.HELMET`) : à régler sur les premières vraies prises.
 
 ## Monter un outil de version
@@ -202,12 +198,11 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 | Message de `vf run` | Réparation |
 | --- | --- |
 | `aucune prise : vf ingest <id> <fichiers>` | Verser les prises. |
-| `prise 1 : 1179x2556 au lieu de 1206x2622` | La prise ne vient pas de cette voie : `--voie`, ou une nouvelle voie dans `mask/routes.json`. |
+| `prise 1 : 1206x2622, pas en 9:16 ; recadrer la prise avant de la verser` | Recadrer la prise en 9:16 (par exemple 1206x2144), puis la verser à nouveau. |
 | `capture absente : « ligne »` | `uv run vf ingest <id> --capture ligne <fichier>`. |
-| `visage détecté de l'image … pendant le mot gardé « … »` | Le masque a lâché pendant une phrase gardée : la retourner, ou en garder une autre prise. |
 | `hyperframes check refuse le projet :` suivi des erreurs | Chaque ligne nomme la section (`lint`, `runtime`, `layout`, `contrast`…), le code de la règle et le fichier : corriger le gabarit de `templates/hyperframes/` (skill `video-factory`). |
 | `le projet ne doit charger que ses propres fichiers` | Un gabarit charge une adresse de CDN, une police en ligne ou un fichier absent : la ligne nomme le fichier et l'adresse. |
 | `bibliothèque hors du lock : …` | Une scène charge `assets/lib/<nom>/` sans entrée `library` au lock : l'ajouter, ou retirer le chargement. |
-| `qc refuse le master` | Chaque ligne nomme sa borne : durée, sonie, crête vraie, format, zone sûre, plans face caméra, visage (avec l'image et le temps). |
+| `qc refuse le master` | Chaque ligne nomme sa borne : durée, sonie, crête vraie, format, zone sûre, plans face caméra. |
 
 Une construction de whisper.cpp qui échoue faute de compilateur demande `build-essential` (gcc, g++).

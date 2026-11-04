@@ -1,14 +1,13 @@
 """`qc`: the blocking checks of a master and its TikTok export (criterion C2 of #4). Each failure names its bound.
 
-The facts are measured first (ffprobe, FFmpeg's EBU R 128 meter, the face detector on every frame of the master, the
-text boxes the text pass of `compose` found, the plan of `compose`), then judged by pure rules:
+The facts are measured first (ffprobe, FFmpeg's EBU R 128 meter, the text boxes the text pass of `compose` found, the
+plan of `compose`), then judged by pure rules:
 - duration within the bounds of « duree_visee » in the script schema (61 to 65 s);
 - loudness at -14 LUFS to within 1 LU, true peak at -1 dBTP or below;
 - H.264 High, 1440x2560 for the master and 1080x1920 for TikTok, 30 frames per second, constant, BT.709, AAC 48 kHz;
 - all text inside the strictest safe zone of the three platforms (15 % at the top, 35 % at the bottom, 6 % on the
   left, 17.8 % on the right);
-- face-camera shots on half of the duration at most;
-- no frame where the detector finds a face, each one named by its number and time.
+- face-camera shots on half of the duration at most.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
-from video_factory import compose, faces, media, schemas
+from video_factory import compose, media, schemas
 from video_factory.paths import SCRIPT_SCHEMA
 
 DURATION = schemas.duration_bounds(SCRIPT_SCHEMA)
@@ -123,13 +122,6 @@ def check_camera(camera_frames: int, frames: int) -> Check:
     return Check("face caméra", ok, message + ("" if ok else ", plus de la moitié"))
 
 
-def check_faces(found: Sequence[dict], fps: int = compose.FPS) -> Check:
-    if not found:
-        return Check("visages", True, "visages : aucun")
-    frames = [face["frame"] for face in found]
-    return Check("visages", False, f"visage détecté : {frames_named(frames, fps)}")
-
-
 def judge(facts: dict) -> list[Check]:
     """Every check of a master, from its measured facts."""
     return [
@@ -139,7 +131,6 @@ def judge(facts: dict) -> list[Check]:
         check_format("tiktok", facts["tiktok"]),
         check_text(facts["text"]),
         check_camera(facts["camera_frames"], facts["frames"]),
-        check_faces(facts["faces"]),
     ]
 
 
@@ -183,14 +174,3 @@ def loudness(ffmpeg: Path, source: Path) -> tuple[float, float]:
     if not integrated or not peak:
         raise media.MediaError("ebur128 : aucune mesure")
     return float(integrated[-1]), float(peak[-1])
-
-
-def detected_faces(ffmpeg: Path, source: Path, detector: faces.Detector, threshold: float = faces.THRESHOLD) -> list:
-    """Each frame of source where the detector finds a face: number, time, score."""
-    scale = f"scale={faces.WIDTH}:{faces.HEIGHT}:flags=area"
-    found = []
-    for frame, pixels in enumerate(media.frames(ffmpeg, source, faces.WIDTH, faces.HEIGHT, scale)):
-        score = detector.score(pixels)
-        if score >= threshold:
-            found.append({"frame": frame, "time": round(frame / compose.FPS, 3), "score": round(score, 4)})
-    return found
