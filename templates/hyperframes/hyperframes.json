@@ -1,0 +1,26 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
+  "registry": "https://raw.githubusercontent.com/heygen-com/hyperframes/1ff4cefd40c8dad98127fc78e8761c1ac62053dd/registry",
+  "paths": {
+    "blocks": "blocks",
+    "components": "components",
+    "assets": "assets"
+  },
+  "registryItems": [
+    {
+      "name": "mk-specs-list",
+      "type": "hyperframes:block",
+      "target": "blocks/mk-specs-list.html"
+    },
+    {
+      "name": "mk-progress-stat",
+      "type": "hyperframes:block",
+      "target": "blocks/mk-progress-stat.html"
+    },
+    {
+      "name": "caption-highlight",
+      "type": "hyperframes:component",
+      "target": "components/caption-highlight.html"
+    }
+  ]
+}
