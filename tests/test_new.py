@@ -29,14 +29,16 @@ def test_vf_new_creates_a_script_and_a_state_valid_against_the_published_schemas
     assert sorted(path.name for path in folder.iterdir()) == ["script.md", "state.json"]
     fields, _body = frontmatter.split((folder / "script.md").read_text(encoding="utf-8"))
     assert schemas.problems(fields, SCRIPT_SCHEMA) == []
-    assert fields == {"id": "essai", "titre": "Titre à écrire", "plateforme": "tiktok", "duree_visee": 75}
+    assert fields == {"id": "essai", "titre": "Titre à écrire", "plateforme": "tiktok", "duree_visee": 63}
     state = json.loads((folder / "state.json").read_text(encoding="utf-8"))
     assert schemas.problems(state, STATE_SCHEMA) == []
     assert state == {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": "essai",
         "created_at": NOW,
         "script": {"path": "script.md", "sha256": sha256_file(folder / "script.md")},
+        "takes": [],
+        "captures": {},
         "steps": {},
     }
 
@@ -76,11 +78,14 @@ def test_a_script_whose_id_differs_from_its_folder_is_invalid():
 def test_a_state_with_a_step_records_fingerprints_tools_and_parameters():
     state = videos.new_state("essai", "ab" * 32, NOW)
     state["steps"]["transcribe"] = {
-        "inputs": {"voice": "cd" * 32},
-        "outputs": {"words": "ef" * 32},
+        "inputs": {"work": "cd" * 32},
+        "outputs": {"words": {"sha256": "ef" * 32, "file": f"{'ef' * 32}.json"}},
         "tools": {"whisper.cpp": "v1.9.5", "whisper-large-v3-turbo": "5359861c739e955e79d9a303bcbc70fb988958b1"},
         "params": {"language": "fr", "temperature": 0},
+        "code": "ab" * 32,
+        "started_at": NOW,
         "finished_at": NOW,
+        "seconds": 12.5,
     }
     assert schemas.problems(state, STATE_SCHEMA) == []
     state["steps"]["montage"] = state["steps"]["transcribe"]
