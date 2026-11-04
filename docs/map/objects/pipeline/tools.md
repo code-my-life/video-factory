@@ -6,12 +6,13 @@ paths:
   - pipeline/video_factory/tools.py
 hits:
   - pipeline/video_factory/steps.py
+  - pipeline/video_factory/compose.py
   - tests/conftest.py
 ---
 
 # tools
 
-The pinned tools as steps call them (`Toolbox`): paths under `VF_TOOLS`, models, the render image, and the versions a step records (lock entries, video-factory, the Python packages).
+The pinned tools as steps call them (`Toolbox`): paths under `VF_TOOLS`, models, the render image, the files of a library (each checked against its SHA-256 before a project gets it), and the versions a step records (lock entries, video-factory, the Python packages).
 
 ## Why this shape
 

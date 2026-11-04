@@ -1,6 +1,6 @@
 # ADR 0002 : la chaîne de dérush et de rendu
 
-Date : 2026-11-04. Statut : accepté pour la mécanique ; le gabarit visuel est provisoire. Issue [#4](https://github.com/code-my-life/video-factory/issues/4).
+Date : 2026-11-04. Statut : accepté pour la mécanique ; le gabarit visuel est provisoire. Le rendu sans GSAP et la page unique de `compose` sont remplacés par l'[ADR 0003](0003-projet-hyperframes-gsap-et-registre.md). Issue [#4](https://github.com/code-my-life/video-factory/issues/4).
 
 ## Contexte
 
