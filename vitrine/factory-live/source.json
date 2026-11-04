@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/capture-source.schema.json",
+  "source_version": 1,
+  "app": "factory-live",
+  "about": "La démo de factory-live (VITE_DATA_SOURCE=demo), construite au commit figé avec la variante de tournage, comme son site la construit (site/build.mjs).",
+  "repository": "https://github.com/code-my-life/factory-live.git",
+  "commit": "1c3e8ac7afacbc98fd0d806e14208b13fb711f45",
+  "patch": "scenario.patch",
+  "node": "node-24",
+  "install": ["npm", "ci", "--no-audit", "--no-fund"],
+  "build": ["npm", "run", "build", "-w", "@factory-live/web", "--", "--emptyOutDir"],
+  "build_env": {
+    "VITE_DATA_SOURCE": "demo",
+    "VITE_ROUTER": "memory",
+    "FACTORY_LIVE_BASE": "./",
+    "FACTORY_LIVE_PWA": "0",
+    "FACTORY_LIVE_SOURCEMAP": "0"
+  },
+  "out_dir_env": "FACTORY_LIVE_OUT_DIR",
+  "storage": { "factory-live:locale": "fr" },
+  "ready": "h1",
+  "font": "600 16px \"Mona Sans VF\""
+}

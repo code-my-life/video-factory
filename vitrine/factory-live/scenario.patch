@@ -1,0 +1,404 @@
+diff --git a/apps/web/src/demo/initial.ts b/apps/web/src/demo/initial.ts
+index b93b1f3..c15a897 100644
+--- a/apps/web/src/demo/initial.ts
++++ b/apps/web/src/demo/initial.ts
+@@ -346,7 +346,8 @@ export function createInitialState(now: number): DemoState {
+       title: 'Raccourci clavier pour répondre à la dernière question',
+       url: issueUrl(KEYS.shortcut),
+       labels: [TYPE_LABEL.fonctionnalite, FACTORY_LABEL],
+-      station: 'brief',
++      // Shooting variant (video-factory): the issue waits in Intake until its brief is claimed.
++      station: 'intake',
+       previousStation: null,
+       stationChangedAt: null,
+       status: 'queued',
+@@ -359,10 +360,7 @@ export function createInitialState(now: number): DemoState {
+       updatedAt: ago(4 * min),
+       type: 'fonctionnalite',
+       lane: 'failfirst',
+-      journey: trail(ago, 'failfirst', [
+-        ['intake', 4 * min],
+-        ['brief', 4 * min],
+-      ]),
++      journey: trail(ago, 'failfirst', [['intake', 4 * min]]),
+     },
+     {
+       key: KEYS.projects,
+diff --git a/apps/web/src/demo/script.ts b/apps/web/src/demo/script.ts
+index 38d8f14..108951d 100644
+--- a/apps/web/src/demo/script.ts
++++ b/apps/web/src/demo/script.ts
+@@ -1,5 +1,5 @@
+ import { msg } from '@factory-live/contracts';
+-import type { ActivityEvent } from '@factory-live/contracts';
++import type { ActivityEvent, PullRequestView } from '@factory-live/contracts';
+ import { NEMOTRON_SUPER, QWEN_LOCAL, limitsOf, model } from './catalog.ts';
+ import { contactAcceptance } from './acceptance.ts';
+ import { answered, hookTimeoutDiagnosis } from './diagnoses.ts';
+@@ -18,6 +18,7 @@ import {
+   patchIssue,
+   patchRun,
+   pushActivity,
++  resolveIntervention,
+ } from './state.ts';
+ import type { DemoState } from './state.ts';
+ 
+@@ -294,6 +295,331 @@ function hookTimeoutFix(): ScenarioStep[] {
+   return [fix(HOOK_FIX_AT, false), fix(HOOK_REPO_AT, true)];
+ }
+ 
++/**
++ * Shooting variant (video-factory, showcase videos): claude-cockpit#73 goes the whole line in one
++ * scenario, Intake, Brief, Implémentation, the gate's fail-first, Ta revue, Fusion, CI de main,
++ * Déploiement, Terminé. Its coder works for two seconds, then every station follows the facts the
++ * app reads from GitHub: gate green, owner's approval, merge, main green, deployment.
++ */
++const SHORTCUT_PR = 80;
++const SHORTCUT_GATE: ToolStep[] = [
++  { tool: 'terminal', detail: 'npm ci', status: 'ok', durationMs: 21_000 },
++  {
++    tool: 'terminal',
++    detail: 'git stash && npm test -- quick-reply (base, le test doit échouer)',
++    status: 'ok',
++    durationMs: 7_400,
++  },
++  { tool: 'terminal', detail: 'npm test -- quick-reply', status: 'ok', durationMs: 7_100 },
++  {
++    tool: 'terminal',
++    detail: `gh pr checks ${SHORTCUT_PR} --watch`,
++    status: 'ok',
++    durationMs: 5_200,
++  },
++];
++const SHORTCUT_GATE_SUMMARY =
++  'Approuvé : le test échoue sur la base et passe sur la PR, checks verts';
++const SHORTCUT_IMPL_SUMMARY = `⌘J et Ctrl+J répondent à la dernière question, 4 tests verts, PR #${SHORTCUT_PR}`;
++
++function gateShortcutStep(state: DemoState, now: number, step: ToolStep): void {
++  patchAgent(state, 'gate', {
++    state: 'tool',
++    action: { kind: 'tool', label: step.tool, detail: step.detail, startedAt: iso(now) },
++    lastHeartbeatAt: iso(now),
++  });
++  activity(state, now, {
++    kind: 'tool',
++    profile: 'gate',
++    issueKey: KEYS.shortcut,
++    cardId: CARDS.shortcutImpl,
++    label: step.tool,
++    detail: step.detail,
++    status: step.status,
++    durationMs: step.durationMs,
++    model: NEMOTRON_SUPER,
++  });
++}
++
++function shortcutPr(state: DemoState): PullRequestView {
++  const pr = state.snapshot.issues.find((issue) => issue.key === KEYS.shortcut)?.pr;
++  if (!pr) throw new Error(`PR de démo absente : ${KEYS.shortcut}`);
++  return pr;
++}
++
++function shortcutDelivery(): ScenarioStep[] {
++  return [
++    {
++      at: 62.5,
++      run: (state, now) => {
++        patchIssue(state, KEYS.shortcut, {
++          pr: {
++            number: SHORTCUT_PR,
++            url: prUrl('claude-cockpit', SHORTCUT_PR),
++            title: `feat(island): ⌘J répond à la dernière question (#73)`,
++            state: 'draft',
++            checks: 'pending',
++            reviewDecision: null,
++            autoMerge: false,
++            additions: 96,
++            deletions: 7,
++            changedFiles: 3,
++            reviews: [],
++            mergedAt: null,
++            mainChecks: null,
++            deployment: null,
++          },
++          updatedAt: iso(now),
++        });
++        const opened = msg('github.prOpened', { pr: SHORTCUT_PR, draft: true });
++        const diffstat = msg('github.diffstat', { additions: 96, deletions: 7, files: 3 });
++        activity(state, now, {
++          kind: 'github',
++          profile: 'coder',
++          issueKey: KEYS.shortcut,
++          label: opened,
++          detail: diffstat,
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'github',
++          profile: 'coder',
++          cardId: CARDS.shortcutImpl,
++          label: opened,
++          detail: diffstat,
++          tone: 'neutral',
++        });
++      },
++    },
++    {
++      at: 63,
++      run: (state, now) => {
++        patchCard(state, KEYS.shortcut, CARDS.shortcutImpl, {
++          status: 'running',
++          assignee: 'gate',
++          changedFiles: [
++            { path: 'desktop/src/island/QuickReply.tsx', edits: 3 },
++            { path: 'desktop/src/shortcuts.ts', edits: 1 },
++            { path: 'desktop/test/quick-reply.test.js', edits: 2 },
++          ],
++          testsPassed: 4,
++          testsTotal: 4,
++        });
++        patchIssue(state, KEYS.shortcut, {
++          station: 'gate',
++          status: 'active',
++          activeProfiles: ['gate'],
++          updatedAt: iso(now),
++          pr: { ...shortcutPr(state), state: 'open' },
++        });
++        patchAgent(state, 'coder', {
++          state: 'idle',
++          cardId: null,
++          issueKey: null,
++          action: null,
++          runStartedAt: null,
++        });
++        patchAgent(state, 'gate', {
++          state: 'thinking',
++          cardId: CARDS.shortcutImpl,
++          issueKey: KEYS.shortcut,
++          action: {
++            kind: 'llm',
++            label: msg('activity.action.llm'),
++            detail: NEMOTRON_SUPER,
++            startedAt: iso(now),
++          },
++          runStartedAt: iso(now),
++          lastHeartbeatAt: iso(now),
++        });
++        addRun(state, KEYS.shortcut, CARDS.shortcutImpl, {
++          id: 187,
++          profile: 'gate',
++          role: 'reviewer',
++          status: 'running',
++          outcome: null,
++          startedAt: iso(now),
++          endedAt: null,
++          model: model('nvidia', NEMOTRON_SUPER, 'live'),
++          laneModel: null,
++          summary: null,
++          tokens: null,
++          costUsd: null,
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'kanban',
++          profile: 'coder',
++          cardId: CARDS.shortcutImpl,
++          label: msg('timeline.reviewRequested', { reviewer: 'gate' }),
++          detail: SHORTCUT_IMPL_SUMMARY,
++          tone: 'attention',
++        });
++        activity(state, now, {
++          kind: 'kanban',
++          profile: 'gate',
++          issueKey: KEYS.shortcut,
++          cardId: CARDS.shortcutImpl,
++          label: 'claimed',
++          detail: msg('activity.kanban.claimed', { profile: 'gate' }),
++          status: 'ok',
++        });
++      },
++    },
++    ...toolLoop(SHORTCUT_GATE, 64, 1.5, 68.5, gateShortcutStep),
++    {
++      at: 70,
++      run: (state, now) => {
++        patchCard(state, KEYS.shortcut, CARDS.shortcutImpl, { status: 'review' });
++        patchRun(state, KEYS.shortcut, CARDS.shortcutImpl, 187, {
++          status: 'done',
++          outcome: 'completed',
++          endedAt: iso(now),
++          summary: SHORTCUT_GATE_SUMMARY,
++        });
++        patchIssue(state, KEYS.shortcut, {
++          station: 'review',
++          status: 'waiting_human',
++          activeProfiles: [],
++          updatedAt: iso(now),
++          pr: {
++            ...shortcutPr(state),
++            checks: 'success',
++            reviewDecision: 'review_required',
++            autoMerge: true,
++          },
++        });
++        patchAgent(state, 'gate', {
++          state: 'idle',
++          cardId: null,
++          issueKey: null,
++          action: null,
++          runStartedAt: null,
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'kanban',
++          profile: 'gate',
++          cardId: CARDS.shortcutImpl,
++          label: msg('timeline.completed'),
++          detail: SHORTCUT_GATE_SUMMARY,
++          tone: 'done',
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'github',
++          profile: null,
++          cardId: null,
++          label: msg('github.reviewRequested', {
++            pr: SHORTCUT_PR,
++            reviewer: 'cddev',
++            autoMerge: true,
++          }),
++          detail: null,
++          tone: 'neutral',
++        });
++        openIntervention(state, {
++          id: 'iv-shortcut-pr',
++          kind: 'pr_approval',
++          severity: 'info',
++          title: msg('intervention.title.prReady'),
++          issueKey: KEYS.shortcut,
++          cardId: CARDS.shortcutRelease,
++          profile: 'coordinator',
++          question: `La gate a approuvé la PR #${SHORTCUT_PR} : le test échoue sur la base et passe sur la PR, checks verts. L’auto-merge est armé : ton approbation la fusionne.`,
++          openedAt: iso(now),
++          push: false,
++          actions: [
++            {
++              kind: 'link',
++              label: msg('intervention.action.approvePr'),
++              url: prUrl('claude-cockpit', SHORTCUT_PR),
++            },
++          ],
++          unblock: null,
++        });
++      },
++    },
++    {
++      at: 76,
++      run: (state, now) => {
++        resolveIntervention(state, 'iv-shortcut-pr', iso(now));
++        patchCard(state, KEYS.shortcut, CARDS.shortcutRelease, { status: 'running' });
++        patchIssue(state, KEYS.shortcut, {
++          station: 'merge',
++          status: 'active',
++          updatedAt: iso(now),
++          pr: {
++            ...shortcutPr(state),
++            reviewDecision: 'approved',
++            reviews: [{ state: 'approved', at: iso(now) }],
++          },
++        });
++      },
++    },
++    {
++      at: 79,
++      run: (state, now) => {
++        patchIssue(state, KEYS.shortcut, {
++          station: 'ci',
++          updatedAt: iso(now),
++          pr: { ...shortcutPr(state), state: 'merged', mergedAt: iso(now), mainChecks: 'pending' },
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'github',
++          profile: null,
++          cardId: null,
++          label: msg('github.merged'),
++          detail: null,
++          tone: 'done',
++        });
++        activity(state, now, {
++          kind: 'github',
++          profile: null,
++          issueKey: KEYS.shortcut,
++          label: msg('github.merged'),
++          detail: `PR #${SHORTCUT_PR}`,
++          status: 'ok',
++        });
++      },
++    },
++    {
++      at: 83,
++      run: (state, now) => {
++        patchIssue(state, KEYS.shortcut, {
++          station: 'deploy',
++          updatedAt: iso(now),
++          pr: { ...shortcutPr(state), mainChecks: 'success', deployment: 'pending' },
++        });
++      },
++    },
++    {
++      at: 87,
++      run: (state, now) => {
++        patchCard(state, KEYS.shortcut, CARDS.shortcutImpl, { status: 'done' });
++        patchCard(state, KEYS.shortcut, CARDS.shortcutRelease, { status: 'done' });
++        patchIssue(state, KEYS.shortcut, {
++          station: 'done',
++          status: 'done',
++          activeProfiles: [],
++          updatedAt: iso(now),
++          pr: { ...shortcutPr(state), deployment: 'success' },
++        });
++        addTimeline(state, KEYS.shortcut, {
++          at: iso(now),
++          source: 'kanban',
++          profile: 'coordinator',
++          cardId: CARDS.shortcutRelease,
++          label: msg('timeline.completed'),
++          detail: `PR #${SHORTCUT_PR} fusionnée, main verte, déployée`,
++          tone: 'done',
++        });
++      },
++    },
++  ];
++}
++
+ export function buildScript(): ScenarioStep[] {
+   const steps: ScenarioStep[] = [
+     ...toolLoop(CLAUDE_LANE, 3, 4, 36, claudeLaneStep),
+@@ -442,6 +768,7 @@ export function buildScript(): ScenarioStep[] {
+           costUsd: null,
+         });
+         patchIssue(state, KEYS.shortcut, {
++          station: 'brief',
+           status: 'active',
+           activeProfiles: ['coordinator'],
+           updatedAt: iso(now),
+@@ -838,7 +1165,7 @@ export function buildScript(): ScenarioStep[] {
+       },
+     },
+     {
+-      at: 64,
++      at: 60.5,
+       run: (state, now) => {
+         patchAgent(state, 'coder', {
+           model: model('freellmapi', 'dots3-note-preview', 'live'),
+@@ -871,7 +1198,8 @@ export function buildScript(): ScenarioStep[] {
+         });
+       },
+     },
+-    ...toolLoop(CODER_SHORTCUT, 68, 5, 140, coderShortcutStep),
++    ...toolLoop(CODER_SHORTCUT, 61, 0.25, 62.25, coderShortcutStep),
++    ...shortcutDelivery(),
+     ...toolLoop(GATE_TEAM, 70, 7, 140, gateTeamStep),
+     ...hookTimeoutFix(),
+   ];
