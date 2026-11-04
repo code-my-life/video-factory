@@ -1,0 +1,31 @@
+{
+  "board": {
+    "slug": "studio",
+    "name": "Studio",
+    "description": "Les vidéos de Code My Life, de l'idée à la publication (video-factory#7).",
+    "icon": "🎬"
+  },
+  "stations": [
+    {"key": "idee", "label": "Idée", "lane": "studio-idee", "kind": "code"},
+    {"key": "script", "label": "Script", "lane": "studio-script", "kind": "writer"},
+    {"key": "approbation", "label": "Approbation", "lane": "studio-approbation", "kind": "owner"},
+    {"key": "tournage", "label": "Tournage", "lane": "studio-tournage", "kind": "owner"},
+    {"key": "montage", "label": "Montage", "lane": "studio-montage", "kind": "code"},
+    {"key": "revue", "label": "Revue", "lane": "studio-revue", "kind": "owner"},
+    {"key": "publication", "label": "Publication", "lane": "studio-publication", "kind": "code"},
+    {"key": "publiee", "label": "Publiée", "lane": null, "kind": "end"}
+  ],
+  "profiles": {
+    "studio-writer": {"path": "profiles/studio-writer", "env_from_root": ["FREELLMAPI_API_KEY"]}
+  },
+  "service": {
+    "unit": "video-factory-studio.service",
+    "host": "127.0.0.1",
+    "port": 8448,
+    "https_port": 8448,
+    "tick_seconds": 20
+  },
+  "brand": "~/perso/cv-site/docs/brand/positionnement.md",
+  "writer_timeout_seconds": 1500,
+  "claim_ttl_seconds": 1800
+}

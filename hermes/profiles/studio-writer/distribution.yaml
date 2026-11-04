@@ -1,0 +1,10 @@
+name: studio-writer
+version: 0.1.0
+description: "Brouillons de scripts des vidéos de Code My Life, à partir de idees.md et du positionnement de la marque. Seul profil du board studio ; jamais lancé par le dispatcher."
+hermes_requires: ">=0.22.0"
+author: "code-my-life/video-factory"
+license: "MIT"
+env_requires:
+  - name: FREELLMAPI_API_KEY
+    description: "Clé unifiée freellmapi (routeur local sur 127.0.0.1:3001), copiée de la racine par hermes/install.sh"
+    required: true

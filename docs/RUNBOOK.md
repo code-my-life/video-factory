@@ -151,6 +151,41 @@ refait le rendu et le master même à jour. `state.json` garde l'empreinte des f
 - Le style des gabarits de `compose` (`templates/hyperframes/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres par groupes de trois mots au plus sur un voile sombre. Les blocs du registre y sont restylés sobrement, sans charte : le style définitif viendra du design system vidéo, après des maquettes validées.
 - Le seuil de silence de `transcribe` (-40 dB), le lexique des hésitations (`align.FILLERS`), la couleur « casque » (`voice.HELMET`) : à régler sur les premières vraies prises.
 
+## Le board « studio »
+
+Le board Hermès « studio » suit chaque vidéo de l'idée à la publication, à côté du board « factory », dans le même Hermès (décisions : [ADR 0004](decisions/0004-board-studio.md)). Prérequis : Hermès installé et sa passerelle Telegram active, `tailscale` connecté au tailnet, `TELEGRAM_CHAT_ID` et `FREELLMAPI_API_KEY` dans `~/.hermes/.env`.
+
+```bash
+hermes/install.sh              # installe, ou remet à jour ce qui a changé ; relançable
+hermes/install.sh --uninstall  # retire le service, la page du tailnet, le profil studio-writer et le board
+```
+
+L'install crée le board `studio`, installe le profil `studio-writer` (et copie sa clé `FREELLMAPI_API_KEY` de la racine), écrit et lance le service utilisateur `video-factory-studio.service` (`vf studio serve`, depuis ce clone, avec les `VF_*` de l'environnement de l'install), puis publie la page sur le tailnet : `https://<machine>.<tailnet>.ts.net:8448`, en HTTPS, jamais sur Internet. Elle ne touche ni à `~/.hermes/config.yaml`, ni à la factory. La désinstallation supprime le board et ses cartes ; les vidéos (`VF_CONTENT`) et le magasin (`VF_MEDIA`, dont `publication/`) restent.
+
+### Les stations
+
+| Station | Qui | Ce qui se passe | Le geste du propriétaire |
+| --- | --- | --- | --- |
+| Idée | voie en code | `vf new <id>` | Ouvrir la vidéo : la page (« Nouvelle vidéo ») ou `uv run vf studio carte <id> "l'idée"` |
+| Script | `studio-writer` | Un brouillon de `script.md`, à partir de l'idée, de `idees.md` et du positionnement de la marque, gardé seulement s'il passe les règles en code | |
+| Approbation | le propriétaire | Message Telegram | Approuver : `/kanban --board studio unblock <carte>`, ou le bouton de la page |
+| Tournage | le propriétaire | Message Telegram | Envoyer les prises depuis la page, dans Safari (ou `vf ingest`) |
+| Montage | voie en code | `vf run <id>`, sans modèle | |
+| Revue | le propriétaire | Message Telegram, le master sur la page | Valider : `unblock`, ou le bouton |
+| Publication | voie en code, puis le propriétaire | `vf publish <id>` range l'export TikTok, le master et la légende ; message Telegram | Publier à la main, puis « Publiée » : `unblock`, ou le bouton (avec le lien) |
+| Publiée | | La carte est terminée | |
+
+Pour refaire : `/kanban --board studio unblock <carte> --reason "refaire : ce qui change"`, ou le bouton « Refaire » de la page. Depuis Approbation, le brouillon est réécrit avec la demande ; depuis Revue, `vf run` repasse. Une voie en échec (un brouillon refusé, `vf run` ou `vf publish` qui échoue) laisse la carte à sa station, prévient sur Telegram avec la raison, et repart au déblocage.
+
+Une vidéo qui existe déjà s'ouvre par `uv run vf studio carte <id>` : sa carte entre à la station que son `state.json` prouve. Ne pas ouvrir une carte par `/kanban create` sans `--assignee studio-idee` : elle irait à l'assigné par défaut de la factory.
+
+### Le service
+
+- `systemctl --user status video-factory-studio`, `journalctl --user -u video-factory-studio -f` : les passes (toutes les 20 s), les voies et les requêtes de la page.
+- `uv run vf studio tick` : une passe au premier plan, pour voir ce que chaque carte ferait.
+- La page répond sur `http://127.0.0.1:8448/sante` ; `tailscale serve status` montre sa publication sur le port 8448.
+- Les captures d'écran d'une vidéo (`[capture: …]`) se versent encore par `uv run vf ingest <id> --capture <nom> <fichier>`.
+
 ## Monter un outil de version
 
 1. Télécharger le nouveau fichier dans un dossier vide, et calculer son empreinte (`sha256sum`). Une empreinte se calcule toujours sur le fichier téléchargé, jamais recopiée d'une page.

@@ -1,5 +1,5 @@
-"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf status` and `vf run`. Its messages are in French, like
-its docs."""
+"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf status`, `vf run`, `vf publish` and `vf studio`. Its
+messages are in French, like its docs."""
 
 from __future__ import annotations
 
@@ -10,8 +10,10 @@ from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
-from video_factory import __version__, chain, doctor, install, lock, media, paths, videos
+from video_factory import __version__, chain, doctor, install, lock, media, paths, publish, state, videos
 from video_factory.context import StepError, Video
+from video_factory.studio import board as studio_board
+from video_factory.studio import service
 from video_factory.tools import Toolbox, ToolError
 
 
@@ -66,7 +68,62 @@ def parser() -> argparse.ArgumentParser:
         metavar="étape",
         help="refaire ces étapes même à jour (par exemple compose master, pour comparer deux rendus)",
     )
+    out = commands.add_parser(
+        "publish",
+        help="préparer la publication à la main : le fichier TikTok, le master et la légende",
+        description="Vérifie que le master passe qc, puis range dans VF_MEDIA/publication/<id>/ l'export TikTok, "
+        "le master et la légende (le crédit du robot compris). Ne publie rien.",
+    )
+    out.add_argument("id", help="identifiant de la vidéo")
+    board = commands.add_parser("studio", help="le board Hermès « studio » : la page des prises et les voies")
+    actions = board.add_subparsers(dest="action", required=True, metavar="action")
+    actions.add_parser("serve", help="servir la page (127.0.0.1) et faire avancer les cartes, sans fin")
+    actions.add_parser("tick", help="une seule passe sur les cartes du board, au premier plan")
+    card = actions.add_parser("carte", help="ouvrir la carte d'une vidéo (nouvelle idée, ou vidéo qui existe)")
+    card.add_argument("id", help="identifiant de la vidéo")
+    card.add_argument("idee", nargs="?", default="", help="l'idée en une phrase")
     return top
+
+
+def run_publish(video_id: str, home: Path) -> int:
+    places = paths.places(os.environ, home)
+    folder = places.content / "videos" / video_id
+    try:
+        loaded = state.load(folder / videos.STATE_NAME)
+        script = (folder / videos.SCRIPT_NAME).read_text(encoding="utf-8")
+        ready = publish.prepare(loaded, script, places.media)
+    except (state.StateError, OSError) as exc:
+        print(f"vf publish : {exc}", file=sys.stderr)
+        return 1
+    except publish.PublishError as exc:
+        print("vf publish : pas encore publiable", file=sys.stderr)
+        for line in str(exc).splitlines():
+            print(f"  {line}", file=sys.stderr)
+        return 1
+    out = publish.write(ready, places.media, video_id)
+    print(f"vf publish : prêt à publier à la main, dans {out}")
+    for name in publish.FILES.values():
+        print(f"  {name}")
+    print(f"  {publish.CAPTION_NAME} :")
+    for line in ready.caption.splitlines():
+        print(f"    {line}")
+    return 0
+
+
+def run_studio(args: argparse.Namespace, home: Path) -> int:
+    if args.action == "serve":
+        return service.serve(home)
+    studio = service.build(os.environ, home, background=False)
+    try:
+        if args.action == "tick":
+            studio.tick()
+            return 0
+        card = studio.open_card(args.id, args.idee)
+    except studio_board.BoardError as exc:
+        print(f"vf studio : {exc}", file=sys.stderr)
+        return 1
+    print(f"carte {card} : {args.id}")
+    return 0
 
 
 def run_doctor(names: list[str] | None, home: Path) -> int:
@@ -176,6 +233,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_doctor(args.install, home)
     if args.command == "new":
         return run_new(args.id, home)
+    if args.command == "publish":
+        return run_publish(args.id, home)
+    if args.command == "studio":
+        return run_studio(args, home)
     try:
         if args.command == "ingest":
             return run_ingest(args, home)
