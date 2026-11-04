@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The « capture » shot of video-factory: a still or a short silent clip of a real screen, registered for the video,
+      full frame on black and contained in the shot box of compose. A still pushes in slowly (1 to 1.06 over the shot)
+      on a wrapper; a clip plays as it is. compose writes one copy per shot: ID prefixes every id, DURATION is the shot
+      length in seconds, MEDIA the timed image or video element, CONFIG the box and whether the media is a still.
+    -->
+    <style>
+      #{{ID}}-root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: #000;
+      }
+      #{{ID}}-area {
+        position: absolute;
+        overflow: hidden;
+      }
+      #{{ID}}-push {
+        position: absolute;
+        inset: 0;
+        transform-origin: 50% 50%;
+      }
+      #{{ID}}-push img,
+      #{{ID}}-push video {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="{{ID}}-root"
+      data-composition-id="{{ID}}"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-width="1440"
+      data-height="2560"
+    >
+      <div id="{{ID}}-area">
+        <div id="{{ID}}-push">
+          {{MEDIA}}
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+
+        var CONFIG = {{CONFIG}};
+        var DUR = {{DURATION}};
+        var ID = "{{ID}}";
+        var area = document.getElementById(ID + "-area");
+        area.style.left = CONFIG.box.left + "px";
+        area.style.top = CONFIG.box.top + "px";
+        area.style.width = CONFIG.box.width + "px";
+        area.style.height = CONFIG.box.height + "px";
+
+        var tl = gsap.timeline({ paused: true });
+        if (CONFIG.still) {
+          tl.fromTo("#" + ID + "-push", { scale: 1 }, { scale: 1.06, duration: DUR, ease: "none" }, 0);
+        }
+        window.__timelines[ID] = tl;
+      })();
+    </script>
+  </body>
+</html>

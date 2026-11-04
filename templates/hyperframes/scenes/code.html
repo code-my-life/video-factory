@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The « code » shot of video-factory: the command or the code the script quotes, typed character by character on
+      black over the first 60 % of the shot, then held. Typing is a tween of a counter whose onUpdate writes the visible
+      prefix, so any frame is a function of its time. compose writes one copy per shot: ID prefixes every id, DURATION
+      is the shot length in seconds, CONFIG the text, its largest size and the box. Provisional look until the video design system.
+    -->
+    <style>
+      @font-face {
+        font-family: "VF Provisoire";
+        src: url("assets/fonts/Inter-Bold.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
+      }
+      #{{ID}}-root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: #000;
+      }
+      #{{ID}}-text {
+        position: absolute;
+        font-family: "VF Provisoire", sans-serif;
+        font-weight: 700;
+        line-height: 1.25;
+        color: #ffffff;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="{{ID}}-root"
+      data-composition-id="{{ID}}"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-width="1440"
+      data-height="2560"
+    >
+      <div id="{{ID}}-text"></div>
+      <div
+        id="{{ID}}-drv"
+        class="clip"
+        data-start="0"
+        data-duration="{{DURATION}}"
+        data-track-index="0"
+        style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none"
+      ></div>
+    </div>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+
+        var CONFIG = {{CONFIG}};
+        var DUR = {{DURATION}};
+        var ID = "{{ID}}";
+        var el = document.getElementById(ID + "-text");
+        var text = CONFIG.text;
+        el.style.left = CONFIG.box.left + "px";
+        el.style.width = CONFIG.box.width + "px";
+        /* The largest size up to CONFIG.size that holds the text on one line, down to 60 %; beyond that it wraps. */
+        var measure = document.createElement("canvas").getContext("2d");
+        measure.font = "700 " + CONFIG.size + 'px "VF Provisoire"';
+        var natural = measure.measureText(text).width;
+        var room = CONFIG.box.width - 8;
+        var size = natural <= room ? CONFIG.size : Math.max(Math.floor(CONFIG.size * 0.6), Math.floor((CONFIG.size * room) / natural));
+        el.style.fontSize = size + "px";
+        /* Centred in the box at its full length, measured once. */
+        el.textContent = text;
+        var height = el.getBoundingClientRect().height;
+        el.style.top = Math.round(CONFIG.box.top + (CONFIG.box.height - height) / 2) + "px";
+        el.textContent = "";
+
+        var typed = { n: 0 };
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          typed,
+          { n: 0 },
+          {
+            n: text.length,
+            duration: Math.max(0.2, 0.6 * DUR),
+            ease: "none",
+            onUpdate: function () {
+              el.textContent = text.slice(0, Math.min(text.length, Math.floor(typed.n) + 1));
+            },
+          },
+          0,
+        );
+        window.__timelines[ID] = tl;
+      })();
+    </script>
+  </body>
+</html>

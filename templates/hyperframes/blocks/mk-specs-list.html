@@ -1,117 +1,82 @@
-<!-- hyperframes-registry-item: mk-specs-list -->
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <!--
+      The « etapes » shot of video-factory, from the registry block mk-specs-list (hyperframes add, registry at
+      v0.9.12; the file as installed is in git history and its fingerprint in hyperframes.lock.json). Provisional
+      restyle until the video design system: full frame on black, white rows, one font, a white hairline instead of
+      the accent, the column fitted to the shot box of compose. compose writes one copy per shot: ID prefixes every
+      id, DURATION is the shot length in seconds, CONFIG holds the steps and the box.
+    -->
     <style>
-      *,
-      *::before,
-      *::after {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      @font-face {
+        font-family: "VF Provisoire";
+        src: url("assets/fonts/Inter-Bold.woff2") format("woff2");
+        font-weight: 700;
+        font-style: normal;
       }
-      body {
-        background: transparent;
-        overflow: hidden;
-      }
-      #mk-sl-root {
-        /* ---- mk tokens: override in the host to re-skin the family ---- */
-        --mk-font: "Inter", -apple-system, sans-serif;
-        --mk-ink: #1d1d1f;
-        --mk-ink-dim: #6e6e73;
-        --mk-ink-dark: #f5f5f7;
-        --mk-ink-dim-dark: #a1a1a6;
-        --mk-accent: #0071e3;
-        --mk-accent-dark: #7d5cff;
-        --mk-hairline: 2px;
+      #{{ID}}-root {
+        --mk-font: "VF Provisoire", sans-serif;
+        --mk-ink: #ffffff;
+        --mk-line: rgba(255, 255, 255, 0.25);
+        --mk-line-fill: #ffffff;
+        --mk-hairline: 4px;
 
         position: relative;
-        width: 1920px;
-        height: 1080px;
+        width: 1440px;
+        height: 2560px;
         overflow: hidden;
-        background: transparent; /* overlays footage or mk-background */
+        background: #000;
       }
-      #mk-sl-scrim {
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 62%);
-        opacity: 0;
-      }
-      #mk-sl-col {
+      #{{ID}}-col {
         position: absolute;
         display: flex;
         flex-direction: column;
       }
-      .mk-sl-row {
+      .{{ID}}-row {
         font-family: var(--mk-font);
-        line-height: 1;
+        line-height: 1.2;
         opacity: 0;
       }
-      .mk-sl-text {
-        display: flex;
-        align-items: baseline;
-        gap: 18px;
-        white-space: nowrap;
-      }
-      .mk-sl-label {
-        font-weight: 600;
-        font-size: 46px;
+      .{{ID}}-label {
+        display: block;
+        font-weight: 700;
         letter-spacing: -0.015em;
+        white-space: nowrap;
         color: var(--mk-ink);
       }
-      .mk-sl-value {
-        font-weight: 400;
-        font-size: 40px;
-        letter-spacing: -0.01em;
-        color: var(--mk-ink-dim);
-      }
-      .mk-sl-line {
+      .{{ID}}-line {
         position: relative;
         margin-top: 22px;
         height: var(--mk-hairline);
-        background: rgba(0, 0, 0, 0.1);
+        background: var(--mk-line);
         border-radius: 2px;
         overflow: hidden;
       }
-      .mk-sl-line-fill {
+      .{{ID}}-line-fill {
         position: absolute;
         inset: 0;
-        background: var(--mk-accent);
+        background: var(--mk-line-fill);
         transform-origin: left center;
-      }
-      /* dark scheme: white rows for use over footage (overlay look) */
-      .mk-dark .mk-sl-label {
-        color: var(--mk-ink-dark);
-      }
-      .mk-dark .mk-sl-value {
-        color: var(--mk-ink-dim-dark);
-      }
-      .mk-dark .mk-sl-line {
-        background: rgba(255, 255, 255, 0.18);
-      }
-      .mk-dark .mk-sl-line-fill {
-        background: var(--mk-accent-dark);
       }
     </style>
   </head>
   <body>
     <div
-      id="mk-sl-root"
-      data-composition-id="mk-specs-list"
+      id="{{ID}}-root"
+      data-composition-id="{{ID}}"
       data-start="0"
-      data-duration="8"
-      data-width="1920"
-      data-height="1080"
+      data-duration="{{DURATION}}"
+      data-width="1440"
+      data-height="2560"
     >
-      <div id="mk-sl-scrim"></div>
-      <div id="mk-sl-col"></div>
+      <div id="{{ID}}-col"></div>
       <div
-        id="mk-sl-drv"
+        id="{{ID}}-drv"
         class="clip"
         data-start="0"
-        data-duration="8"
+        data-duration="{{DURATION}}"
         data-track-index="0"
         style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none"
       ></div>
@@ -120,103 +85,62 @@
       (function () {
         window.__timelines = window.__timelines || {};
 
-        /* ---- published parameters (inspector-style CONFIG) ---- */
-        var CONFIG = {
-          scheme: "light", // "light" (ink rows) | "dark" (white rows, for footage)
-          rows: [
-            { label: "Design", value: "Minimal, clean lines" },
-            { label: "Typography", value: "Inter SemiBold" },
-            { label: "Motion", value: "Restrained, no bounce" },
-            { label: "Color", value: "Stage + one accent" },
-            { label: "Shapes", value: "Capsules & rounded cards" },
-          ],
-          underline: true, // accent sweep under each row
-          lineWidth: 660, // px
-          scrim: 0, // 0–1 left-edge dark scrim for readability over footage
-          x: 160, // column left edge
-          rowGap: 44, // px between rows
-          stagger: 0.18, // s between row entrances
-          animationIn: true,
-          animationOut: true,
-        };
+        /* compose writes the rows (one label per step), the shot box in pixels and the largest font size. */
+        var CONFIG = {{CONFIG}};
 
-        var DUR = 8;
-        var root = document.getElementById("mk-sl-root");
-        var col = document.getElementById("mk-sl-col");
-        var scrim = document.getElementById("mk-sl-scrim");
+        var DUR = {{DURATION}};
+        var ID = "{{ID}}";
+        var col = document.getElementById(ID + "-col");
+        var count = CONFIG.rows.length;
+        var LINE = 22 + 4;
 
-        if (CONFIG.scheme === "dark") root.classList.add("mk-dark");
-        scrim.style.opacity = String(CONFIG.scrim);
+        /* One size for every row: the largest that fits the box, each label on one line. */
+        var measure = document.createElement("canvas").getContext("2d");
+        var size = Math.min(CONFIG.size, Math.floor((CONFIG.box.height - count * LINE) / (count * 1.2 + (count - 1) * 0.6)));
+        CONFIG.rows.forEach(function (r) {
+          measure.font = "700 " + size + 'px "VF Provisoire"';
+          var width = measure.measureText(r.label).width;
+          if (width > CONFIG.box.width - 8) size = Math.floor((size * (CONFIG.box.width - 8)) / width);
+        });
 
-        /* build rows */
         CONFIG.rows.forEach(function (r, i) {
           var row = document.createElement("div");
-          row.id = "mk-sl-row-" + i;
-          row.className = "mk-sl-row";
-          if (i > 0) row.style.marginTop = CONFIG.rowGap + "px";
-
-          var text = document.createElement("div");
-          text.className = "mk-sl-text";
+          row.id = ID + "-row-" + i;
+          row.className = ID + "-row";
+          if (i > 0) row.style.marginTop = Math.round(size * 0.6) + "px";
           var label = document.createElement("span");
-          label.className = "mk-sl-label";
+          label.className = ID + "-label";
+          label.style.fontSize = size + "px";
           label.textContent = r.label;
-          text.appendChild(label);
-          if (r.value) {
-            var value = document.createElement("span");
-            value.className = "mk-sl-value";
-            value.textContent = r.value;
-            text.appendChild(value);
-          }
-          row.appendChild(text);
-
-          if (CONFIG.underline) {
-            var line = document.createElement("div");
-            line.className = "mk-sl-line";
-            line.style.width = CONFIG.lineWidth + "px";
-            var fill = document.createElement("div");
-            fill.id = "mk-sl-fill-" + i;
-            fill.className = "mk-sl-line-fill";
-            line.appendChild(fill);
-            row.appendChild(line);
-          }
+          row.appendChild(label);
+          var line = document.createElement("div");
+          line.className = ID + "-line";
+          line.style.width = CONFIG.box.width + "px";
+          var fill = document.createElement("div");
+          fill.id = ID + "-fill-" + i;
+          fill.className = ID + "-line-fill";
+          line.appendChild(fill);
+          row.appendChild(line);
           col.appendChild(row);
         });
 
-        /* center the column vertically */
-        var colH =
-          CONFIG.rows.length * (46 + 22 + (CONFIG.underline ? 2 : 0)) +
-          (CONFIG.rows.length - 1) * CONFIG.rowGap;
-        col.style.left = CONFIG.x + "px";
-        col.style.top = Math.round((1080 - colH) / 2) + "px";
+        /* The column, centred in the box. */
+        var colH = col.getBoundingClientRect().height;
+        col.style.left = CONFIG.box.left + "px";
+        col.style.top = Math.round(CONFIG.box.top + (CONFIG.box.height - colH) / 2) + "px";
 
+        /* The rows arrive over the first 60 % of the shot, one after the other, and stay until the cut. */
+        var stagger = count > 1 ? Math.min(0.6, Math.max(0.08, (0.6 * DUR - 0.9) / (count - 1))) : 0;
         var tl = gsap.timeline({ paused: true });
-
         CONFIG.rows.forEach(function (r, i) {
-          var row = document.getElementById("mk-sl-row-" + i);
-          var t0 = (CONFIG.animationIn ? 0.3 : 0) + i * CONFIG.stagger;
-
-          if (CONFIG.animationIn) {
-            gsap.set(row, { opacity: 0, x: -36 });
-            tl.to(row, { opacity: 1, x: 0, duration: 0.7, ease: "power3.out" }, t0);
-          } else {
-            gsap.set(row, { opacity: 1 });
-          }
-
-          if (CONFIG.underline) {
-            var fill = document.getElementById("mk-sl-fill-" + i);
-            gsap.set(fill, { scaleX: 0 });
-            tl.to(fill, { scaleX: 1, duration: 0.8, ease: "power2.inOut" }, t0 + 0.15);
-          }
+          var row = document.getElementById(ID + "-row-" + i);
+          var fill = document.getElementById(ID + "-fill-" + i);
+          var t0 = 0.15 + i * stagger;
+          tl.fromTo(row, { opacity: 0, x: -36 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, t0);
+          tl.fromTo(fill, { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.inOut" }, t0 + 0.1);
         });
 
-        /* exit + hard kill */
-        if (CONFIG.animationOut) {
-          tl.to(col, { opacity: 0, y: -20, duration: 0.4, ease: "power2.in" }, DUR - 0.5);
-          tl.to(scrim, { opacity: 0, duration: 0.4, ease: "power2.in" }, DUR - 0.5);
-        }
-        tl.set(root, { visibility: "hidden" }, DUR - 0.02);
-
-        window.__timelines["mk-specs-list"] = tl;
+        window.__timelines[ID] = tl;
       })();
     </script>
   </body>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Root of the HyperFrames project compose writes (video pass): the take, cut by the decision list, in a wrapper the
+      punch-ins scale, one scene per shot of the script, and the captions track. GSAP is the pinned copy compose puts
+      in assets/lib/gsap/: nothing is fetched. The look is provisional until the video design system.
+    -->
+    <script src="assets/lib/gsap/gsap.min.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: #000;
+      }
+      #camera-wrap {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1440px;
+        height: 2560px;
+        transform-origin: 50% 40%;
+      }
+      #camera {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1440px;
+        height: 2560px;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-fps="30"
+      data-width="1440"
+      data-height="2560"
+    >
+{{CAMERA}}
+{{HOSTS}}
+    </div>
+    <script id="vf-zooms" type="application/json">{{ZOOMS}}</script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        var zooms = JSON.parse(document.getElementById("vf-zooms").textContent);
+        var wrap = document.getElementById("camera-wrap");
+        var tl = gsap.timeline({ paused: true });
+        if (wrap) {
+          // A punch-in: the wrapper of the take, never the timed video, lands at 1.12 in four frames and cuts back.
+          zooms.forEach(function (zoom) {
+            tl.fromTo(wrap, { scale: 1 }, { scale: 1.12, duration: 4 / 30, ease: "power3.out" }, zoom.start);
+            tl.set(wrap, { scale: 1 }, zoom.end);
+          });
+        }
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>
