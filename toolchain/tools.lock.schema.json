@@ -25,7 +25,8 @@
           { "$ref": "#/$defs/source_build" },
           { "$ref": "#/$defs/npm" },
           { "$ref": "#/$defs/docker_image" },
-          { "$ref": "#/$defs/docker_build" }
+          { "$ref": "#/$defs/docker_build" },
+          { "$ref": "#/$defs/library" }
         ]
       }
     }
@@ -143,6 +144,31 @@
         "kind": { "const": "docker-image" },
         "url": { "type": "string", "pattern": "^[a-z0-9.-]+(?:/[a-z0-9._-]+)+:[A-Za-z0-9._-]+$" },
         "image": { "type": "string", "pattern": "^[a-z0-9._/-]+:[A-Za-z0-9._-]+$" }
+      },
+      "unevaluatedProperties": false
+    },
+    "library": {
+      "description": "Une bibliothèque qu'une composition charge (GSAP, Lottie, anime.js, Three.js) : des fichiers pris dans une archive npm vérifiée par son empreinte (sha256), chacun vérifié à son tour, installés sous VF_TOOLS puis copiés par compose dans le projet (assets/lib/<nom>/). files associe le nom du fichier copié à son chemin dans l'archive et à son empreinte.",
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "required": ["url", "license", "files"],
+      "properties": {
+        "kind": { "const": "library" },
+        "url": { "$ref": "#/$defs/https" },
+        "license": { "type": "string", "minLength": 1 },
+        "files": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "$ref": "#/$defs/relative_path" },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
       },
       "unevaluatedProperties": false
     },

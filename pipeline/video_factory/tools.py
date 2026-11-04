@@ -13,6 +13,7 @@ from pathlib import Path
 
 from video_factory import __version__
 from video_factory import lock as lockfile
+from video_factory.hashing import sha256_file
 
 # The Python packages a step's results depend on, recorded with their versions next to the external tools.
 PYTHON_PACKAGES = ("ai-edge-litert", "numpy")
@@ -57,6 +58,22 @@ class Toolbox:
     def model(self, name: str) -> Path:
         """A model file of the lock (kind « file »)."""
         return self.file(name, str(self.entry(name)["file"]))
+
+    def library(self, name: str) -> dict[str, Path]:
+        """The files of a library (kind « library »), each checked against its SHA-256 before a project gets it."""
+        tool = self.entry(name)
+        found = {}
+        for file, pinned in dict(tool["files"]).items():
+            path = self.file(name, file)
+            if sha256_file(path) != pinned["sha256"]:
+                fix = lockfile.install_command(name)
+                raise ToolError(f"{name} : {file} n'a pas l'empreinte du lock ({path}) : {fix}")
+            found[file] = path
+        return found
+
+    def libraries(self) -> list[str]:
+        """The names of the libraries of the lock, in lock order."""
+        return [str(tool["name"]) for tool in self.pinned["tools"] if tool["kind"] == "library"]
 
     def image(self, name: str) -> str:
         return str(self.entry(name)["image"])

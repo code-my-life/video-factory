@@ -13,6 +13,7 @@ from video_factory.hashing import sha256_bytes, sha256_file, tree_sha256
 from video_factory.paths import Places
 
 MODEL = b"model weights"
+GSAP = b"/*! GSAP 3.15.0 */"
 DIGEST = "ab" * 32
 
 
@@ -45,6 +46,9 @@ def setup(tmp_path: Path):
     package = npm_dir / "node_modules" / "hyperframes"
     package.mkdir(parents=True)
     (package / "package.json").write_text(json.dumps({"name": "hyperframes", "version": "0.9.12"}))
+    gsap_dir = tools / "gsap" / "3.15.0"
+    gsap_dir.mkdir(parents=True)
+    (gsap_dir / "gsap.min.js").write_bytes(GSAP)
     repo = tmp_path / "repo"
     (repo / "toolchain").mkdir(parents=True)
     (repo / "toolchain" / "package-lock.json").write_text("{}")
@@ -99,6 +103,14 @@ def setup(tmp_path: Path):
                 "config_expect": {"path": "~/.hyperframes/config.json", "values": {"telemetryEnabled": False}},
             },
             {
+                "name": "gsap",
+                "kind": "library",
+                "version": "3.15.0",
+                "install": "uv run vf doctor --install gsap",
+                "sha256": "ef" * 32,
+                "files": {"gsap.min.js": {"path": "package/gsap.min.js", "sha256": sha256_bytes(GSAP)}},
+            },
+            {
                 "name": "render-base",
                 "kind": "docker-image",
                 "version": "22",
@@ -150,6 +162,26 @@ def test_a_model_with_another_fingerprint_is_a_gap(setup):
     text, status, _run = diagnose(setup)
     assert status == 1
     assert "model : model.bin : empreinte" in text
+
+
+@pytest.mark.acceptance("une copie de GSAP à la mauvaise empreinte est signalée")
+def test_a_gsap_copy_with_the_wrong_fingerprint_is_reported(setup):
+    (setup["tools"] / "gsap" / "3.15.0" / "gsap.min.js").write_bytes(b"/*! GSAP 3.15.1 */")
+    text, status, _run = diagnose(setup)
+    assert status == 1
+    assert f"écart  gsap : gsap.min.js : empreinte {sha256_bytes(b'/*! GSAP 3.15.1 */')[:16]}… au lieu de" in text
+    assert "répare : uv run vf doctor --install gsap" in text
+    assert "vf doctor : 1 problème." in text
+
+
+def test_a_library_with_a_missing_or_an_extra_file_is_a_gap(setup):
+    folder = setup["tools"] / "gsap" / "3.15.0"
+    (folder / "gsap.min.js").unlink()
+    (folder / "gsap.js").write_bytes(GSAP)
+    text, status, _run = diagnose(setup)
+    assert status == 1
+    assert "gsap : gsap.min.js absent" in text
+    assert "gsap : fichiers en trop dans" in text and "gsap.js" in text
 
 
 def test_an_archive_tool_with_a_changed_file_is_a_gap(setup):

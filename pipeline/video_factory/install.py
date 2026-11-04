@@ -197,6 +197,31 @@ def install_npm(
         run_step([str(final / command[0]), *command[1:]], env, final, "après l'installation")
 
 
+def install_library(tool: lockfile.Tool, final: Path, scratch: Path, opener: Opener) -> None:
+    """Only the files the lock names, taken from the verified archive and each checked against its own SHA-256."""
+    archive = download(str(tool["url"]), str(tool["sha256"]), scratch / "download", opener)
+    staged = scratch / "staged"
+    staged.mkdir()
+    try:
+        with tarfile.open(archive) as tar:
+            for name, pinned in dict(tool["files"]).items():
+                try:
+                    member = tar.getmember(str(pinned["path"]))
+                except KeyError as exc:
+                    raise InstallError(f"{tool['name']} : {pinned['path']} absent de l'archive") from exc
+                source = tar.extractfile(member) if member.isfile() else None
+                if source is None:
+                    raise InstallError(f"{tool['name']} : {pinned['path']} n'est pas un fichier")
+                (staged / name).write_bytes(source.read())
+    except tarfile.TarError as exc:
+        raise InstallError(f"{archive.name} : archive refusée ({exc})") from exc
+    for name, pinned in dict(tool["files"]).items():
+        found = sha256_file(staged / name)
+        if found != pinned["sha256"]:
+            raise InstallError(f"{tool['name']} : {name} d'empreinte {found} au lieu de {pinned['sha256']}")
+    swap_in(staged, final)
+
+
 def install_docker_image(tool: lockfile.Tool) -> None:
     image = str(tool["image"])
     pinned = f"{doctor.image_repository(image)}@sha256:{tool['sha256']}"
@@ -262,6 +287,8 @@ def install_tool(
                 install_file(tool, final, scratch, opener)
             elif kind == "source-build":
                 install_source_build(tool, lock, places, final, scratch, opener)
+            elif kind == "library":
+                install_library(tool, final, scratch, opener)
             else:
                 install_npm(tool, lock, places, final, scratch, opener, repo_root)
     except OSError as exc:
