@@ -11,7 +11,9 @@ import numpy as np
 import pytest
 
 from conftest import ffmpeg
-from video_factory import ingest, media
+from video_factory import chain, ingest, media, store, videos
+from video_factory.context import StepError, Video
+from video_factory.paths import SCRIPT_VITRINE_TEMPLATE, Places
 
 APPLE = [
     "-movflags",
@@ -183,3 +185,42 @@ def test_a_take_without_sound_is_refused(tools, tmp_path):
     ffmpeg(box, "-f", "lavfi", "-i", "color=s=108x192:r=30:d=1", "-c:v", "libx264", mute)
     with pytest.raises(ingest.IngestError, match="aucune piste son"):
         ingest.make_working_copy(box.ffmpeg, box.ffprobe, [mute], tmp_path / "m.mkv")
+
+
+@pytest.mark.acceptance("une voix sans image et un rush sans son sont acceptés")
+def test_a_voice_without_picture_and_a_rush_without_sound_are_accepted(tools, tmp_path):
+    box = tools("ffmpeg")
+    content, store_root = tmp_path / "content", tmp_path / "media"
+    (content / ".git").mkdir(parents=True)
+    folder = videos.create(
+        content, "essai", SCRIPT_VITRINE_TEMPLATE.read_text(encoding="utf-8"), "2026-11-05T09:00:00Z"
+    )
+    script_path = folder / "script.md"
+    script_path.write_text(script_path.read_text(encoding="utf-8") + "Coucou. [plan: rush]\n", encoding="utf-8")
+    video = Video.open(Places(content=content, media=store_root, tools=tmp_path / "tools"), "essai", box)
+    # The voice of a showcase: an MP3 from the voice generator, with its tags, and no picture.
+    voice = tmp_path / "voix.mp3"
+    ffmpeg(box, "-f", "lavfi", "-i", "sine=f=220:r=44100:d=1", "-ac", "2", "-c:a", "libmp3lame", "-metadata",
+           "title=secret", voice)  # fmt: skip
+    stored = chain.register_voice(video, voice)
+    assert voice.is_file() and stored["file"].endswith(".mp3")
+    record = chain.run_step(video, chain.BY_NAME["ingest"], lambda _line: None)
+    probe = json.loads(store.path(store_root, record["outputs"]["probe"]).read_text(encoding="utf-8"))
+    assert probe["voice"]["codec"] == "mp3"
+    work = probe["work"]
+    assert (work["codec"], work["sample_rate"], work["channels"]) == ("pcm_s24le", 48000, 1)
+    assert abs(work["duration"] - 1.0) < 0.1
+    copy = store.path(store_root, record["outputs"]["work"])
+    assert copy.suffix == ".wav" and "secret" not in json.dumps(tags_of(box, copy))
+    # A rush without sound is a capture of the video, kept without sound at 30 frames per second.
+    rush = tmp_path / "rush.mp4"
+    ffmpeg(box, "-f", "lavfi", "-i", "testsrc=size=108x192:rate=60:duration=1", "-c:v", "libx264", rush)
+    captured = chain.register_capture(video, "rush", rush)
+    assert captured["kind"] == "video"
+    streams = tags_of(box, store.path(store_root, captured))["streams"]
+    assert [(stream["codec_type"], stream["r_frame_rate"]) for stream in streams] == [("video", "30/1")]
+    # A picture is not a voice.
+    still = tmp_path / "ecran.png"
+    ffmpeg(box, "-f", "lavfi", "-i", "color=s=108x192", "-frames:v", "1", still)
+    with pytest.raises(StepError, match="aucune piste son, ce n'est pas une voix"):
+        chain.register_voice(video, still)

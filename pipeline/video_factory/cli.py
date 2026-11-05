@@ -1,5 +1,5 @@
-"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf status`, `vf run`, `vf publish`, `vf studio` and
-`vf capture`. Its messages are in French, like its docs."""
+"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf voix`, `vf status`, `vf run`, `vf publish`, `vf studio`
+and `vf capture`. Its messages are in French, like its docs."""
 
 from __future__ import annotations
 
@@ -11,7 +11,20 @@ from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
-from video_factory import __version__, chain, compose, doctor, install, lock, media, paths, publish, state, videos
+from video_factory import (
+    __version__,
+    chain,
+    compose,
+    doctor,
+    install,
+    lock,
+    media,
+    paths,
+    publish,
+    state,
+    videos,
+    vitrine,
+)
 from video_factory.capture import demo as capture_demo
 from video_factory.capture import plan as capture_plan
 from video_factory.capture import scene as capture_scene
@@ -43,6 +56,7 @@ def parser() -> argparse.ArgumentParser:
         description="Crée videos/<id>/script.md et videos/<id>/state.json dans le dépôt de contenu (VF_CONTENT).",
     )
     new.add_argument("id", help="identifiant : minuscules, chiffres et tirets")
+    new.add_argument("--vitrine", action="store_true", help="une vitrine : la voix sur des plans d'app et des rushs")
     take = commands.add_parser(
         "ingest",
         help="verser les prises d'une vidéo (puis faire sa copie de travail) ou ses captures d'écran",
@@ -51,6 +65,7 @@ def parser() -> argparse.ArgumentParser:
     )
     take.add_argument("id", help="identifiant de la vidéo")
     take.add_argument("files", nargs="*", type=Path, metavar="fichier", help="les prises, dans l'ordre")
+    take.add_argument("--voix", type=Path, metavar="fichier", help="la voix d'une vitrine (fichier audio)")
     take.add_argument(
         "--capture",
         nargs=2,
@@ -59,6 +74,15 @@ def parser() -> argparse.ArgumentParser:
         metavar=("nom", "fichier"),
         help="une capture appelée par [capture: <nom>] dans le script",
     )
+    voice = commands.add_parser(
+        "voix",
+        help="le texte de la voix d'une vitrine, à coller dans ElevenLabs",
+        description="Écrit videos/<id>/voix-elevenlabs.txt depuis le script : les répliques dans l'ordre, avec leurs "
+        "indications de jeu ([ton: …]) et une pause entre elles. « v3 » pour Eleven v3 (étiquettes), « v2 » pour "
+        "Eleven Multilingual v2 (pauses de 0,8 s, sans étiquette).",
+    )
+    voice.add_argument("id", help="identifiant de la vidéo")
+    voice.add_argument("--modele", choices=vitrine.MODELS, default="v3", help="le modèle d'ElevenLabs (défaut : v3)")
     show = commands.add_parser("status", help="dire, étape par étape, ce qui est à jour et ce qui est à refaire")
     show.add_argument("id", help="identifiant de la vidéo")
     chain_run = commands.add_parser(
@@ -215,9 +239,9 @@ def run_doctor(names: list[str] | None, home: Path) -> int:
     return status
 
 
-def run_new(video_id: str, home: Path) -> int:
+def run_new(video_id: str, home: Path, showcase: bool = False) -> int:
     places = paths.places(os.environ, home)
-    template = paths.SCRIPT_TEMPLATE.read_text(encoding="utf-8")
+    template = (paths.SCRIPT_VITRINE_TEMPLATE if showcase else paths.SCRIPT_TEMPLATE).read_text(encoding="utf-8")
     try:
         folder = videos.create(places.content, video_id, template, videos.utc_now())
     except videos.VideoError as exc:
@@ -240,13 +264,17 @@ def open_video(video_id: str, home: Path) -> Video:
 
 
 def run_ingest(args: argparse.Namespace, home: Path) -> int:
-    if not args.files and not args.capture:
-        print("vf ingest : aucune prise ni capture à verser", file=sys.stderr)
+    if not args.files and not args.capture and args.voix is None:
+        print("vf ingest : aucune prise, voix ni capture à verser", file=sys.stderr)
         return 1
     video = open_video(args.id, home)
     for name, file in args.capture:
         stored = chain.register_capture(video, name.strip(), Path(file))
         print(f"capture « {name.strip()} » : {stored['kind']}, {stored['file']}")
+    if args.voix is not None:
+        stored = chain.register_voice(video, args.voix)
+        print(f"voix : {stored['file']}")
+        chain.run_step(video, chain.BY_NAME["ingest"], say)
     if args.files:
         chain.register_takes(video, args.files)
         for take in video.state["takes"]:
@@ -255,8 +283,41 @@ def run_ingest(args: argparse.Namespace, home: Path) -> int:
     return 0
 
 
+def run_voice(video_id: str, model: str, home: Path) -> int:
+    places = paths.places(os.environ, home)
+    script_path = places.content / "videos" / video_id / videos.SCRIPT_NAME
+    try:
+        text = vitrine.elevenlabs_text(vitrine.parse(script_path.read_text(encoding="utf-8")), model)
+    except (OSError, ValueError) as exc:
+        print(f"vf voix : {exc}", file=sys.stderr)
+        return 1
+    target = script_path.with_name("voix-elevenlabs.txt")
+    target.write_text(text, encoding="utf-8")
+    print(text, end="")
+    print(f"\nécrit dans {target}")
+    return 0
+
+
+def media_lines(video: Video) -> list[str]:
+    """The files of a video in the store: its voice, its takes and its captures, by name."""
+    found = []
+    if "voix" in video.state:
+        found.append(f"  voix           {video.state['voix']['file']}")
+    for number, take in enumerate(video.state["takes"], 1):
+        found.append(f"  prise {number:<8d} {take['file']}")
+    for name, capture in sorted(video.state["captures"].items()):
+        kind = "image" if capture["kind"] == "image" else "extrait"
+        found.append(f"  {kind} {name:<20s} {capture['file']}")
+    return found
+
+
 def run_status(video_id: str, home: Path) -> int:
     video = open_video(video_id, home)
+    files = media_lines(video)
+    if files:
+        print("fichiers rangés :")
+        print("\n".join(files))
+        print("étapes :")
     for found in chain.status(video):
         print(f"  {found.label:14s} {found.step}")
         for reason in found.reasons:
@@ -294,7 +355,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "doctor":
         return run_doctor(args.install, home)
     if args.command == "new":
-        return run_new(args.id, home)
+        return run_new(args.id, home, args.vitrine)
+    if args.command == "voix":
+        return run_voice(args.id, args.modele, home)
     if args.command == "publish":
         return run_publish(args.id, home)
     if args.command == "studio":

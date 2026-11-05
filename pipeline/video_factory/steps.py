@@ -40,6 +40,14 @@ def write_json(path: Path, document: object) -> Path:
     return path
 
 
+def is_vitrine(video: Video) -> bool:
+    """Whether the video is a showcase (« genre: vitrine »): its voice is a file of its own, its shots are captures."""
+    try:
+        return script.genre_of(video.script_text()) == script.VITRINE
+    except ValueError as exc:
+        raise StepError(f"script.md : {exc}") from exc
+
+
 def parsed_script(video: Video) -> script.Script:
     try:
         return script.parse(video.script_text())
@@ -51,6 +59,10 @@ def parsed_script(video: Video) -> script.Script:
 
 
 def ingest_inputs(video: Video) -> dict[str, str]:
+    if is_vitrine(video):
+        if "voix" not in video.state:
+            raise StepError(f"aucune voix : vf ingest {video.id} --voix <fichier>")
+        return {"voix": video.state["voix"]["sha256"]}
     if not video.state["takes"]:
         raise StepError(f"aucune prise : vf ingest {video.id} <fichiers>")
     return {f"take-{index}": take["sha256"] for index, take in enumerate(video.state["takes"], 1)}
@@ -62,6 +74,15 @@ def ingest_params(_video: Video) -> dict:
 
 def ingest_run(video: Video, scratch: Path) -> Result:
     tools = video.toolbox
+    if is_vitrine(video):
+        work = scratch / "work.wav"
+        try:
+            voice = video.media / video.state["voix"]["file"]
+            described = ingest.make_voice_copy(tools.ffmpeg, tools.ffprobe, voice, work)
+        except ingest.IngestError as exc:
+            raise StepError(str(exc)) from exc
+        report = write_json(scratch / "probe.json", described)
+        return Result({"work": (work, "wav"), "probe": (report, "json")}, {"duration": described["work"]["duration"]})
     takes = [video.media / take["file"] for take in video.state["takes"]]
     work = scratch / "work.mkv"
     try:
@@ -125,6 +146,7 @@ def align_params(_video: Video) -> dict:
             "abandon": align.ABANDON,
         },
         "fillers": [" ".join(phrase) for phrase in align.FILLERS],
+        "pieces": list(align.PIECES),
     }
 
 
@@ -141,6 +163,9 @@ def align_run(video: Video, scratch: Path) -> Result:
 
 
 def cut_inputs(video: Video) -> dict[str, str]:
+    if is_vitrine(video):
+        # Steps 4 and 5 of #28: the voice placed line by line, and the montage of a showcase.
+        raise StepError("le montage d'une vitrine n'est pas encore dans la chaîne (#28, PR 2) : arrêt après align")
     return {
         "alignment": video.output_ref("align", "alignment")["sha256"],
     }

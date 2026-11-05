@@ -7,25 +7,39 @@
 - A punch-in is written after the word to stress: « [zoom] ».
 - HTML comments are not spoken (the template's instructions live in one).
 
-Each word keeps its written form, shown in the captions, and a normalized form compared with the transcript.
+A showcase script (« genre: vitrine » in its front matter) has its own annotations instead, read by `vitrine.py`: they
+place each line on its shots and add no spoken word, so the words and sentences read here are the same.
+
+Each word keeps its written form, shown in the captions, and a normalized form compared with the transcript. A mark
+of punctuation written apart stays with its word, so the captions keep it: a closing one (« code ! », « d'usine : »)
+with the word before, an opening one (« « bien ») with the word after, separated by a no-break space where French
+typography puts one (before « ! ? : ; » », after « « »).
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from video_factory import frontmatter
 
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 ANNOTATION = re.compile(r"\[(?P<kind>[a-z]+)(?:\s*:\s*(?P<content>[^\]]*))?\]")
 SHOT_KINDS = ("stat", "etapes", "code", "capture")
+FACE_CAMERA, VITRINE = "face-camera", "vitrine"
+# The annotations of a showcase script, read by vitrine.py; « zoom » and the shots above belong to the face camera.
+VITRINE_KINDS = ("plan", "jumeaux", "suite", "fin", "ton", "appel")
 SEPARATOR = "|"
 # Typographic apostrophes (right and left single quotation marks) and the backtick read as the straight apostrophe.
 APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "`": "'"})
 # Inside a word only letters, digits, the apostrophe and the hyphen count; the rest is punctuation.
 INNER = re.compile(r"[^\w'\-]+")
+# Marks written apart: the high ones of French typography take a no-break space before them, the opening guillemet one
+# after it; an opening mark goes with the word after it.
+HIGH_MARKS = frozenset("!?:;»")
+OPENING = frozenset("«(\u201c\u2018")  # «, (, and the left double and single quotation marks
+NO_BREAK = "\u00a0"
 
 
 class ScriptError(ValueError):
@@ -79,8 +93,15 @@ def body_lines(text: str) -> list[tuple[int, str]]:
     return [(offset + number, line.strip()) for number, line in enumerate(body.split("\n"), 1) if line.strip()]
 
 
+def genre_of(text: str) -> str:
+    """The genre of a script.md text: « vitrine » for a showcase, else the face camera."""
+    fields, _body = frontmatter.split(text)
+    return VITRINE if fields.get("genre") == VITRINE else FACE_CAMERA
+
+
 def parse(text: str) -> Script:
     """The words, sentences, shots and punch-ins of a script.md text."""
+    vitrine = genre_of(text) == VITRINE
     words: list[Word] = []
     sentences: list[tuple[int, int]] = []
     shots: list[Shot] = []
@@ -93,7 +114,10 @@ def parse(text: str) -> Script:
             add_words(line[position : match.start()], len(sentences), words, number)
             anchor = len(words) - 1 if len(words) > first else first
             kind, content = match.group("kind"), (match.group("content") or "").strip()
-            if kind == "zoom" and match.group("content") is None:
+            if vitrine:
+                if kind not in VITRINE_KINDS:
+                    raise ScriptError(f"ligne {number} : annotation « {match.group(0)} » inconnue dans une vitrine")
+            elif kind == "zoom" and match.group("content") is None:
                 zooms.append(Zoom(anchor))
             elif kind in SHOT_KINDS and content:
                 pending.append((kind, content, len(words)))
@@ -116,7 +140,14 @@ def parse(text: str) -> Script:
 def add_words(text: str, sentence: int, words: list[Word], number: int) -> None:
     if "[" in text or "]" in text:
         raise ScriptError(f"ligne {number} : crochet sans annotation dans « {text.strip()} »")
+    opening = ""
     for token in text.split():
         norm = normalize(token)
         if norm:
-            words.append(Word(token, norm, sentence))
+            words.append(Word(f"{opening}{token}", norm, sentence))
+            opening = ""
+        elif token[0] in OPENING:
+            opening += token + (NO_BREAK if token[-1] == "«" else "")
+        elif words and words[-1].sentence == sentence:
+            space = NO_BREAK if token[0] in HIGH_MARKS else ""
+            words[-1] = replace(words[-1], text=f"{words[-1].text}{space}{token}")

@@ -1,13 +1,20 @@
 """`align`: the transcript aligned on the script by dynamic programming, each spoken word labelled.
 
 The alignment reads the transcript word by word and moves along the script. Besides matching, inserting and deleting a
-word, the speaker may restart (go back to an earlier word of the current or the previous sentence) or abandon a
+word, and joining the pieces of a word whisper heard apart (« Factory » « Live » for « factory-live »), the speaker may
+restart (go back to an earlier word of the current or the previous sentence) or abandon a
 sentence (jump to its end). The cheapest path splits the transcript into attempts at each sentence; the last complete
 attempt of each sentence is kept, the other attempts are retakes. Then each word is:
 - « kept »: said in the kept attempt of its sentence, with the index of the script word it says;
 - « retake »: said in another attempt, or between two attempts of the same sentence;
 - « filler »: a hesitation of the French lexicon below, outside the script;
 - « off_script »: any other word that is not in the script.
+
+The document also gives each word of the script its time (« script_words »): the time of the spoken word kept for it,
+its written form whatever whisper heard (« Cloud » said for « Claude »), from the start of its first piece to the end of
+its last. A script word no spoken word was kept for (whisper heard « les PR » as one word,
+« l'EPR ») shares the time around it: the gap between its neighbours, or else the span of the neighbour that was heard
+longer than written, the one that swallowed it. A showcase's captions are read from them.
 """
 
 from __future__ import annotations
@@ -58,6 +65,8 @@ INSERT_FILLER = 0.5
 DELETE = 1.0
 RESTART = 0.9
 ABANDON = 0.6
+# A word heard in pieces: two or three spoken words that, put end to end, are exactly the written word.
+PIECES = (2, 3)
 
 
 @dataclass
@@ -66,6 +75,10 @@ class Attempt:
     matched: list[tuple[int, int]] = field(default_factory=list)  # (transcript index, script index)
     inserted: list[int] = field(default_factory=list)
     complete: bool = False
+
+    def said(self) -> int:
+        """How many words of the sentence this attempt said (a word heard in pieces counts once)."""
+        return len({j for _i, j in self.matched})
 
     def first(self) -> int | None:
         spoken = [i for i, _j in self.matched] + self.inserted
@@ -86,6 +99,11 @@ def edit_distance(a: str, b: str) -> int:
     return previous[-1]
 
 
+def key(text: str) -> str:
+    """A word as compared across its pieces: normalized, without hyphen or apostrophe."""
+    return normalize(text).replace("-", "").replace("'", "")
+
+
 def substitution(spoken: str, written: str) -> float:
     """Equal words cost nothing; close spellings (a transcription slip) cost less than unrelated words."""
     if spoken == written:
@@ -101,9 +119,11 @@ def sentence_of(script: Script) -> list[int]:
 
 def path(spoken: Sequence[str], script: Script) -> list[tuple]:
     """The cheapest sequence of operations reading every spoken word and reaching the end of the script:
-    ("M", i, j), ("I", i), ("D", j), ("R", from_j, to_j), ("A", from_j, to_j)."""
+    ("M", i, j), ("J", first_i, j, pieces), ("I", i), ("D", j), ("R", from_j, to_j), ("A", from_j, to_j)."""
     written = [word.norm for word in script.words]
+    keys = [key(word) for word in written]
     count, length = len(spoken), len(written)
+    joined = {(i, n): key("".join(spoken[i : i + n])) for n in PIECES for i in range(count - n + 1)}
     sentences = script.sentences
     inf = float("inf")
     cost = [[inf] * (length + 1) for _ in range(count + 1)]
@@ -120,6 +140,10 @@ def path(spoken: Sequence[str], script: Script) -> list[tuple]:
                     candidate = above[j - 1] + substitution(word, written[j - 1])
                     if candidate <= best:
                         best, step = candidate, ("M", i - 1, j - 1)
+                    for pieces in PIECES:
+                        first = i - pieces
+                        if first >= 0 and joined[first, pieces] == keys[j - 1] and cost[first][j - 1] + MATCH < best:
+                            best, step = cost[first][j - 1] + MATCH, ("J", first, j - 1, pieces)
                 row[j], here[j] = best, step
         for j in range(1, length + 1):
             if row[j - 1] + DELETE < row[j]:
@@ -152,7 +176,7 @@ def backtrack(back: list[list[tuple | None]], count: int, length: int) -> list[t
             raise AssertionError(f"alignment path broken at ({i}, {j})")
         steps.append(step)
         kind = step[0]
-        if kind == "M":
+        if kind in ("M", "J"):
             i, j = step[1], step[2]
         elif kind == "I":
             i = step[1]
@@ -172,17 +196,19 @@ def attempts(steps: Sequence[tuple], script: Script) -> tuple[list[Attempt], lis
     current: Attempt | None = None
     for step in steps:
         kind = step[0]
-        if kind in ("M", "D"):
-            j = step[2] if kind == "M" else step[1]
+        if kind in ("M", "J", "D"):
+            j = step[1] if kind == "D" else step[2]
             if current is None or current.sentence != sentences[j]:
                 current = Attempt(sentences[j])
                 found.append(current)
             if kind == "M":
                 current.matched.append((step[1], j))
+            elif kind == "J":
+                current.matched.extend((i, j) for i in range(step[1], step[1] + step[3]))
             start, end = script.sentences[sentences[j]]
             if j + 1 == end:
                 # Reaching the end counts as complete when at least half of the sentence was said.
-                current.complete = 2 * len(current.matched) >= end - start
+                current.complete = 2 * current.said() >= end - start
                 current = None
         elif kind == "I":
             (current.inserted if current is not None else outside).append(step[1])
@@ -217,7 +243,7 @@ def rank(attempt: Attempt) -> tuple[bool, int]:
     one wins (attempts are compared in order with >=); without a complete attempt, the one with the most words said."""
     if attempt.complete:
         return True, 0
-    return False, len(attempt.matched)
+    return False, attempt.said()
 
 
 def between_attempts_of_one_sentence(index: int, found: Sequence[Attempt]) -> bool:
@@ -247,6 +273,73 @@ def mark_fillers(spoken: Sequence[str], result: list[tuple[str, int | None]]) ->
     return result
 
 
+def script_times(aligned: Sequence[dict], script: Script) -> list[dict]:
+    """The time of each script word, « said » when a spoken word was kept for it, shared with its neighbours if not."""
+    times: list[list[float] | None] = [None] * len(script.words)
+    heard: dict[int, str] = {}
+    for word in aligned:
+        if word["label"] == KEPT and word["script"] is not None:
+            found = times[word["script"]]
+            times[word["script"]] = [word["start"], word["end"]] if found is None else [found[0], word["end"]]
+            heard[word["script"]] = heard.get(word["script"], "") + word["text"]
+    surplus = {j: len(key(text)) - len(key(script.words[j].text)) for j, text in heard.items()}
+    said = [found is not None for found in times]
+    index = 0
+    while index < len(times):
+        if times[index] is not None:
+            index += 1
+            continue
+        end = index
+        while end < len(times) and times[end] is None:
+            end += 1
+        share(times, index, end, surplus)
+        index = end
+    return [
+        {
+            "text": word.text,
+            "start": round(span[0], 3),
+            "end": round(span[1], 3),
+            "said": known,
+            "sentence": word.sentence,
+        }
+        for word, span, known in zip(script.words, times, said, strict=True)
+    ]
+
+
+def share(times: list[list[float] | None], first: int, end: int, surplus: dict[int, int]) -> None:
+    """Times for the run [first, end) of unsaid script words: the gap between their neighbours, split evenly, or else
+    the span of the neighbour heard longer than written (the word before them when both or neither were), split with
+    it."""
+    count = end - first
+    before = times[first - 1] if first > 0 else None
+    after = times[end] if end < len(times) else None
+    low = before[1] if before else (after[0] if after else 0.0)
+    high = after[0] if after else low
+    if high - low >= 0.05 * count:
+        step = (high - low) / count
+        for k in range(count):
+            times[first + k] = [low + k * step, low + (k + 1) * step]
+        return
+    if before is not None and after is not None and surplus.get(end, 0) > surplus.get(first - 1, 0):
+        before = None
+    if before is not None:
+        start, stop = before
+        step = (stop - start) / (count + 1)
+        times[first - 1] = [start, start + step]
+        for k in range(count):
+            times[first + k] = [start + (k + 1) * step, start + (k + 2) * step]
+        return
+    if after is not None:
+        start, stop = after
+        step = (stop - start) / (count + 1)
+        for k in range(count):
+            times[first + k] = [start + k * step, start + (k + 1) * step]
+        times[end] = [start + count * step, stop]
+        return
+    for k in range(count):
+        times[first + k] = [0.0, 0.0]
+
+
 def align(words: Sequence[dict], script: Script) -> dict:
     """The alignment document: each transcript word with its label, and per sentence what was kept or missed."""
     spoken = [normalize(word["text"]) for word in words]
@@ -263,4 +356,4 @@ def align(words: Sequence[dict], script: Script) -> dict:
     ]
     said = {index for label, index in labelled if label == KEPT}
     missing = [j for j in range(len(script.words)) if j not in said]
-    return {"words": aligned, "missing": missing}
+    return {"words": aligned, "missing": missing, "script_words": script_times(aligned, script)}

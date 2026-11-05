@@ -34,6 +34,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/media" }
     },
+    "voix": {
+      "description": "La voix d'une vitrine, enregistrée ou générée (ElevenLabs pour la vidéo 1), telle que livrée, dans le magasin des médias.",
+      "$ref": "#/$defs/media"
+    },
     "captures": {
       "description": "Les captures d'écran ou courts extraits muets que le script appelle par [capture: <nom>], nettoyés de leurs métadonnées.",
       "type": "object",

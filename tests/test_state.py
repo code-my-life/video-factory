@@ -167,7 +167,7 @@ def test_the_vf_command_names_what_is_missing(tmp_path, monkeypatch, capsys):
     assert "vidéo « absente » introuvable" in capsys.readouterr().err
     assert cli.main(["new", "essai"]) == 0
     assert cli.main(["ingest", "essai"]) == 1
-    assert "aucune prise ni capture" in capsys.readouterr().err
+    assert "aucune prise, voix ni capture" in capsys.readouterr().err
     assert cli.main(["run", "essai"]) == 1
     assert "aucune prise : vf ingest essai <fichiers>" in capsys.readouterr().err
     assert cli.main(["status", "essai"]) == 0

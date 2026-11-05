@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from video_factory import ingest, media, steps, store
 from video_factory import state as statefile
-from video_factory import steps, store
 from video_factory.context import StepError, Video
 from video_factory.hashing import sha256_bytes, sha256_file
 from video_factory.paths import REPO_ROOT
@@ -249,6 +249,23 @@ def register_takes(video: Video, files: Sequence[Path]) -> None:
             raise StepError(f"{file} introuvable")
     video.state["takes"] = [store.put(video.media, file, extension(file), keep_source=True) for file in files]
     video.save()
+
+
+def register_voice(video: Video, file: Path) -> dict:
+    """Store the voice of a showcase as delivered (a copy, the original stays where it is) and make it the video's."""
+    if not file.is_file():
+        raise StepError(f"{file} introuvable")
+    try:
+        ingest.voice_summary(media.probe(video.toolbox.ffprobe, file), file.name)
+    except (ingest.IngestError, media.MediaError) as exc:
+        raise StepError(str(exc)) from exc
+    video.state["voix"] = store.put(video.media, file, extension(file), keep_source=True)
+    found = statefile.problems(video.state)
+    if found:
+        del video.state["voix"]
+        raise StepError("voix refusée :\n" + "\n".join(found))
+    video.save()
+    return video.state["voix"]
 
 
 def register_capture(video: Video, name: str, file: Path) -> dict:
