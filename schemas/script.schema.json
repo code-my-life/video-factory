@@ -52,6 +52,31 @@
       "type": "string",
       "pattern": "^[0-9]+(?:[.,][0-9]+)?$"
     },
+    "icone": {
+      "description": "Une vitrine : la capture de l'icône de l'app (vf ingest --capture), sur le bandeau et l'écran de fin.",
+      "type": "string",
+      "minLength": 1
+    },
+    "ecran_fin": {
+      "description": "Une vitrine : le nom de l'écran de fin, puis son badge et l'icône du badge, « nom | badge | icône ».",
+      "type": "string",
+      "minLength": 1
+    },
+    "legende": {
+      "description": "La phrase du sujet en tête de la légende publiée ; le titre sinon.",
+      "type": "string",
+      "minLength": 1
+    },
+    "mots_cles": {
+      "description": "Les mots-clés en fin de légende, tels qu'ils sont publiés.",
+      "type": "string",
+      "minLength": 1
+    },
+    "voix_ia": {
+      "description": "L'outil qui a généré la voix, quand elle l'est : la légende le dit et vf publish rappelle l'étiquette IA.",
+      "type": "string",
+      "minLength": 1
+    },
     "duree_visee": {
       "description": "Durée visée en secondes, de 61 à 65 : à peine plus d'une minute, le seuil de TikTok Creator Rewards (décision du propriétaire du 4 novembre 2026). Ces deux bornes sont aussi celles que qc tient sur le master : vf les lit ici.",
       "type": "integer",

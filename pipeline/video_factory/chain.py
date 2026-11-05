@@ -8,6 +8,7 @@ never ran, are stale, or are asked for; each run writes its record into state.js
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -82,12 +83,20 @@ STEPS = (
         steps.align_params,
         steps.align_run,
     ),
-    Step("cut", ("align",), (), modules("cut"), steps.cut_inputs, steps.cut_params, steps.cut_run),
+    Step(
+        "cut",
+        ("align",),
+        ("ffmpeg",),
+        modules("cut", "montage", "vitrine", "script", "media"),
+        steps.cut_inputs,
+        steps.cut_params,
+        steps.cut_run,
+    ),
     Step(
         "voice",
         ("ingest", "cut"),
         ("ffmpeg",),
-        modules("voice", "media"),
+        modules("voice", "montage", "media"),
         steps.voice_inputs,
         steps.voice_params,
         steps.voice_run,
@@ -96,7 +105,7 @@ STEPS = (
         "compose",
         ("ingest", "cut"),
         ("ffmpeg", "hyperframes-render", *LIBRARIES),
-        modules("compose", "music", "script", "cut", "media", "tools") + TEMPLATE,
+        modules("compose", "montage", "vitrine", "music", "script", "cut", "media", "tools") + TEMPLATE,
         steps.compose_inputs,
         steps.compose_params,
         steps.compose_run,
@@ -152,6 +161,10 @@ def changes(name: str, recorded: dict, current: dict) -> list[str]:
     return found
 
 
+def as_json(value: object) -> object:
+    return json.loads(json.dumps(value))
+
+
 def reasons(video: Video, step: Step) -> list[str] | None:
     """Why a step that ran is stale (empty when up to date); None when it never ran."""
     record = video.state["steps"].get(step.name)
@@ -162,7 +175,8 @@ def reasons(video: Video, step: Step) -> list[str] | None:
     except StepError as exc:
         return [str(exc)]
     found = changes("entrée", record["inputs"], current)
-    if step.params(video) != record["params"]:
+    # Parameters are compared as state.json keeps them: in JSON, where a tuple of the code reads back as a list.
+    if as_json(step.params(video)) != as_json(record["params"]):
         found.append("paramètres modifiés")
     found += changes("outil", record["tools"], step.versions(video))
     if code_fingerprint(step) != record["code"]:

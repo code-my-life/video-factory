@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!-- The cover of a showcase in theme « primer » (#28): a frame of the video (frame.png) under the text of the
+         script's « vignette », one word in the accent colour, rendered at 1080x1920 by the pinned Chromium. The text
+         sits in the centre 3:4 band TikTok and Instagram keep on the profile grid (y 240 to 1680). publish.py fills
+         {{LINES}}. The look of video 1's cover, validated on 2026-11-05. Nothing is fetched. -->
+    <style>
+      @font-face { font-family: "Mona Sans"; font-weight: 200 900; src: url("fonts/MonaSans-wght-latin.woff2") format("woff2"); }
+      html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #010409; }
+      .photo { position: absolute; inset: 0; background: url("frame.png") center / cover; }
+      .shade { position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(1,4,9,0.72) 0%, rgba(1,4,9,0.35) 38%, rgba(1,4,9,0) 55%); }
+      .title { position: absolute; left: 96px; right: 96px; top: 330px; text-align: center;
+        font-family: "Mona Sans", sans-serif; font-weight: 900; line-height: 1.02; letter-spacing: -0.015em; color: #fff;
+        -webkit-text-stroke: 14px #010409; paint-order: stroke fill; text-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+      .title div { white-space: nowrap; }
+      .title em { font-style: normal; color: #4493f8; }
+    </style>
+  </head>
+  <body><div class="photo"></div><div class="shade"></div>
+    <div class="title" id="title">{{LINES}}</div>
+    <script>
+      // The largest size at which every line fits between the margins.
+      const title = document.getElementById("title");
+      let size = 150;
+      title.style.fontSize = size + "px";
+      document.fonts.ready.then(() => {
+        while ([...title.children].some((line) => line.scrollWidth > title.clientWidth) && size > 60) {
+          size -= 2;
+          title.style.fontSize = size + "px";
+        }
+        document.body.dataset.ready = String(size);
+      });
+    </script>
+  </body>
+</html>

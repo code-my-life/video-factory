@@ -11,6 +11,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
+
 from video_factory import (
     align,
     captures,
@@ -19,10 +21,12 @@ from video_factory import (
     ingest,
     master,
     media,
+    montage,
     music,
     qc,
     script,
     transcribe,
+    vitrine,
     voice,
 )
 from video_factory.context import StepError, Video
@@ -46,6 +50,23 @@ def is_vitrine(video: Video) -> bool:
         return script.genre_of(video.script_text()) == script.VITRINE
     except ValueError as exc:
         raise StepError(f"script.md : {exc}") from exc
+
+
+def parsed_vitrine(video: Video) -> vitrine.Vitrine:
+    try:
+        return vitrine.parse(video.script_text())
+    except ValueError as exc:
+        raise StepError(f"script.md : {exc}") from exc
+
+
+def showcase_captures(video: Video) -> dict[str, dict]:
+    """The registered captures a showcase shows (its shots and its icon); one it names but lacks stops the step."""
+    registered = video.state["captures"]
+    names = montage.used_captures(parsed_vitrine(video))
+    missing = [name for name in names if name not in registered]
+    if missing:
+        raise StepError(f"capture absente : {', '.join(missing)} : vf ingest {video.id} --capture <nom> <fichier>")
+    return {name: registered[name] for name in names}
 
 
 def parsed_script(video: Video) -> script.Script:
@@ -163,19 +184,69 @@ def align_run(video: Video, scratch: Path) -> Result:
 
 
 def cut_inputs(video: Video) -> dict[str, str]:
+    found = {"alignment": video.output_ref("align", "alignment")["sha256"]}
+    if not is_vitrine(video):
+        return found
+    # A showcase's decision list also reads the silences of the voice, the lines of its script and its captures.
+    shown = {f"capture:{name}": capture["sha256"] for name, capture in showcase_captures(video).items()}
+    return (
+        found
+        | {
+            "transcript": video.output_ref("transcribe", "transcript")["sha256"],
+            "script": video.script_sha256(),
+        }
+        | shown
+    )
+
+
+def cut_params(video: Video) -> dict:
     if is_vitrine(video):
-        # Steps 4 and 5 of #28: the voice placed line by line, and the montage of a showcase.
-        raise StepError("le montage d'une vitrine n'est pas encore dans la chaîne (#28, PR 2) : arrêt après align")
-    return {
-        "alignment": video.output_ref("align", "alignment")["sha256"],
-    }
-
-
-def cut_params(_video: Video) -> dict:
+        return {
+            "pad": [montage.PAD_IN, montage.PAD_OUT],
+            "captions": {
+                "words": montage.CAPTION_WORDS,
+                "pause": montage.CAPTION_PAUSE,
+                "hold": montage.CAPTION_HOLD,
+                "short_word": montage.SHORT_WORD,
+                "whole_line": montage.WHOLE_LINE,
+            },
+            "fps": montage.FPS,
+        }
     return {"max_silence": cut.MAX_SILENCE, "kept_silence": cut.KEPT_SILENCE, "sample_rate": cut.SAMPLE_RATE}
 
 
+def capture_lengths(video: Video, shown: dict[str, dict], showcase: vitrine.Vitrine) -> dict[str, float]:
+    """The length in seconds of each capture a shot runs to the end of (a piece without « durée »)."""
+    open_ended = {piece.capture for line in showcase.lines for piece in line.pieces if piece.length is None}
+    found = {}
+    for name in sorted(open_ended):
+        probed = media.probe(video.toolbox.ffprobe, video.media / shown[name]["file"])
+        found[name] = media.summary(probed)["duration"]
+    return found
+
+
+def showcase_cut_run(video: Video, scratch: Path) -> Result:
+    showcase = parsed_vitrine(video)
+    shown = showcase_captures(video)
+    transcript = video.output_json("transcribe", "transcript")
+    words = video.output_json("align", "alignment")["script_words"]
+    try:
+        lengths = capture_lengths(video, shown, showcase)
+        edl = montage.decide(showcase, words, transcript["silences"], transcript["duration"], lengths)
+    except (montage.MontageError, media.MediaError) as exc:
+        raise StepError(str(exc)) from exc
+    summary = {
+        "shots": len(edl["shots"]),
+        "lines": len(edl["spoken"]),
+        "caption_groups": len(edl["groups"]),
+        "duration": edl["duration"],
+    }
+    return Result({"edl": (write_json(scratch / "edl.json", edl), "json")}, summary)
+
+
 def cut_run(video: Video, scratch: Path) -> Result:
+    if is_vitrine(video):
+        return showcase_cut_run(video, scratch)
     words = video.output_json("align", "alignment")["words"]
     duration = video.record("ingest")["summary"]["duration"]
     try:
@@ -194,23 +265,27 @@ def voice_inputs(video: Video) -> dict[str, str]:
     return work_input(video) | {"edl": video.output_ref("cut", "edl")["sha256"]}
 
 
-def voice_params(_video: Video) -> dict:
-    return {
-        "clean": voice.CLEAN,
-        "helmet": voice.HELMET,
-        "lufs": voice.TARGET_LUFS,
-        "true_peak": voice.TARGET_PEAK,
-        "lra": voice.TARGET_LRA,
-        "fade": voice.FADE,
-    }
+def voice_params(video: Video) -> dict:
+    loudness = {"lufs": voice.TARGET_LUFS, "true_peak": voice.TARGET_PEAK, "lra": voice.TARGET_LRA, "fade": voice.FADE}
+    if is_vitrine(video):
+        # A showcase's voice is used as delivered: placed line by line, then brought to the loudness of every video.
+        return loudness | {"pad": [montage.PAD_IN, montage.PAD_OUT]}
+    return {"clean": voice.CLEAN, "helmet": voice.HELMET} | loudness
 
 
 def voice_run(video: Video, scratch: Path) -> Result:
     tools = video.toolbox
     edl = video.output_json("cut", "edl")
     coloured, output = scratch / "coloured.wav", scratch / "voice.wav"
-    command = voice.coloured_command(video.output("ingest", "work"), edl["segments"], coloured)
-    media.ffmpeg(tools.ffmpeg, command, "voice, chaîne")
+    if is_vitrine(video):
+        try:
+            command = montage.voice_command(video.output("ingest", "work"), edl["spoken"], edl["duration"], coloured)
+        except montage.MontageError as exc:
+            raise StepError(str(exc)) from exc
+        media.ffmpeg(tools.ffmpeg, command, "voice, répliques placées")
+    else:
+        command = voice.coloured_command(video.output("ingest", "work"), edl["segments"], coloured)
+        media.ffmpeg(tools.ffmpeg, command, "voice, chaîne")
     measured = voice.measure(tools.ffmpeg, coloured)
     applied = voice.normalize(tools.ffmpeg, coloured, measured, output)
     summary = {
@@ -230,6 +305,9 @@ def used_captures(video: Video) -> list[str]:
 
 
 def compose_inputs(video: Video) -> dict[str, str]:
+    if is_vitrine(video):
+        shown = {f"capture:{name}": capture["sha256"] for name, capture in showcase_captures(video).items()}
+        return {"edl": video.output_ref("cut", "edl")["sha256"], "script": video.script_sha256()} | shown
     found = {
         "camera": video.output_ref("ingest", "work")["sha256"],
         "edl": video.output_ref("cut", "edl")["sha256"],
@@ -241,6 +319,16 @@ def compose_inputs(video: Video) -> dict[str, str]:
 
 
 def compose_params(video: Video) -> dict:
+    if is_vitrine(video):
+        return {
+            "size": [compose.WIDTH, compose.HEIGHT],
+            "fps": compose.FPS,
+            "safe": compose.SAFE,
+            "twin_margin": montage.TWIN_MARGIN,
+            "workers": compose.WORKERS,
+            "image": video.toolbox.entry("hyperframes-render")["sha256"],
+            "libraries": {name: video.toolbox.entry(name)["files"] for name in video.toolbox.libraries()},
+        }
     return {
         "size": [compose.WIDTH, compose.HEIGHT],
         "fps": compose.FPS,
@@ -268,26 +356,15 @@ def render_image(video: Video) -> str:
     return found
 
 
-def compose_run(video: Video, scratch: Path) -> Result:
+def check_and_render(
+    video: Video, project: Path, text_root: Path, frames: int, scratch: Path
+) -> tuple[Path, list, dict]:
+    """hyperframes check on the project, then the render of its frames and of its text pass: the frames folder, the
+    text runs and what was measured."""
     tools = video.toolbox
-    edl = video.output_json("cut", "edl")
-    registered = video.state["captures"]
-    try:
-        plan = compose.plan(edl, parsed_script(video), registered)
-    except compose.ComposeError as exc:
-        raise StepError(str(exc).replace("<id>", video.id)) from exc
-    project, video_pass, text_pass, work = scratch / "project", scratch / "video", scratch / "texte", scratch / "work"
+    video_pass, text_pass, work = scratch / "video", scratch / "texte", scratch / "work"
     for folder in (video_pass, text_pass, work):
-        folder.mkdir()
-    try:
-        compose.write_project(project, plan)
-        libraries = compose.ship_libraries(project, tools)
-    except (compose.ComposeError, ToolError) as exc:
-        raise StepError(str(exc)) from exc
-    camera = project / "assets" / "camera.mp4"
-    compose.camera_track(tools.ffmpeg, tools.ffprobe, video.output("ingest", "work"), edl, camera)
-    files = {name: video.media / registered[name]["file"] for name in used_captures(video)}
-    compose.place_captures(tools.ffmpeg, project, plan, files)
+        folder.mkdir(exist_ok=True)
     outside = compose.outside_references(project) + [f"absent : {name}" for name in compose.missing_files(project)]
     if outside:
         raise StepError("le projet ne doit charger que ses propres fichiers :\n" + "\n".join(f"- {o}" for o in outside))
@@ -298,10 +375,8 @@ def compose_run(video: Video, scratch: Path) -> Result:
         report = compose.check_project(compose.check_command(image, environment, project, work))
     except compose.ComposeError as exc:
         raise StepError(str(exc)) from exc
-    checked = round(time.monotonic() - started, 1)
+    measured = {"check": {"seconds": round(time.monotonic() - started, 1), "warnings": compose.check_warnings(report)}}
     rendering = {}
-    text_root = scratch / "texte.html"
-    compose.write_text_root(text_root, plan)
     for name, root, output in (("video", None, video_pass), ("texte", text_root, text_pass)):
         started = time.monotonic()
         try:
@@ -309,8 +384,88 @@ def compose_run(video: Video, scratch: Path) -> Result:
         except media.MediaError as exc:
             raise StepError(str(exc)) from exc
         rendering[name] = round(time.monotonic() - started, 1)
-    frames = compose.rendered(video_pass, plan["frames"])
-    text = compose.text_runs(tools.ffmpeg, compose.rendered(text_pass, plan["frames"]))
+    try:
+        found = compose.rendered(video_pass, frames)
+        text = compose.text_runs(tools.ffmpeg, compose.rendered(text_pass, frames))
+    except compose.ComposeError as exc:
+        raise StepError(str(exc)) from exc
+    return found, text, measured | {"render_seconds": rendering}
+
+
+def showcase_compose_run(video: Video, scratch: Path) -> Result:
+    tools = video.toolbox
+    showcase = parsed_vitrine(video)
+    edl = video.output_json("cut", "edl")
+    files = {name: video.media / capture["file"] for name, capture in showcase_captures(video).items()}
+    project = scratch / "project"
+    try:
+        theme = montage.theme_folder(showcase.theme)
+        document = montage.write_project(tools.ffmpeg, tools.ffprobe, project, theme, showcase, edl, files)
+        libraries = compose.ship_libraries(project, tools)
+        text_root = scratch / "texte.html"
+        text_root.write_text(montage.text_root(document), encoding="utf-8")
+    except (montage.MontageError, compose.ComposeError, ToolError, media.MediaError) as exc:
+        raise StepError(str(exc)) from exc
+    frames, text, measured = check_and_render(video, project, text_root, edl["frames"], scratch)
+    # No music under a showcase for now: a silent track takes its place, so master mixes it like any other.
+    bed = scratch / "music.wav"
+    music.write(bed, np.zeros((round(edl["duration"] * music.SAMPLE_RATE), 2)))
+    plan = {
+        "genre": "vitrine",
+        "frames": edl["frames"],
+        "camera_frames": 0,
+        "words": [
+            {
+                "text": word["text"],
+                "start": compose.frame_of(word["start"]),
+                "end": max(compose.frame_of(word["start"]) + 1, compose.frame_of(word["end"])),
+            }
+            for word in edl["words"]
+        ],
+        "groups": [
+            group | {"start": compose.frame_of(group["start"]), "end": compose.frame_of(group["end"])}
+            for group in edl["groups"]
+        ],
+    }
+    summary = {
+        "frames": edl["frames"],
+        "shots": len(edl["shots"]),
+        "caption_groups": len(edl["groups"]),
+        "theme": showcase.theme,
+        "libraries": libraries,
+    } | measured
+    outputs = {
+        "frames": (frames, "frames"),
+        "music": (bed, "wav"),
+        "plan": (write_json(scratch / "plan.json", plan), "json"),
+        "text": (write_json(scratch / "text.json", {"runs": text}), "json"),
+    }
+    return Result(outputs, summary)
+
+
+def compose_run(video: Video, scratch: Path) -> Result:
+    if is_vitrine(video):
+        return showcase_compose_run(video, scratch)
+    tools = video.toolbox
+    edl = video.output_json("cut", "edl")
+    registered = video.state["captures"]
+    try:
+        plan = compose.plan(edl, parsed_script(video), registered)
+    except compose.ComposeError as exc:
+        raise StepError(str(exc).replace("<id>", video.id)) from exc
+    project = scratch / "project"
+    try:
+        compose.write_project(project, plan)
+        libraries = compose.ship_libraries(project, tools)
+    except (compose.ComposeError, ToolError) as exc:
+        raise StepError(str(exc)) from exc
+    camera = project / "assets" / "camera.mp4"
+    compose.camera_track(tools.ffmpeg, tools.ffprobe, video.output("ingest", "work"), edl, camera)
+    files = {name: video.media / registered[name]["file"] for name in used_captures(video)}
+    compose.place_captures(tools.ffmpeg, project, plan, files)
+    text_root = scratch / "texte.html"
+    compose.write_text_root(text_root, plan)
+    frames, text, measured = check_and_render(video, project, text_root, plan["frames"], scratch)
     bed = scratch / "music.wav"
     music.write(bed, music.bed(plan["frames"] / compose.FPS))
     summary = {
@@ -319,9 +474,7 @@ def compose_run(video: Video, scratch: Path) -> Result:
         "caption_groups": len(plan["groups"]),
         "camera_share": round(plan["camera_frames"] / plan["frames"], 4),
         "libraries": libraries,
-        "check": {"seconds": checked, "warnings": compose.check_warnings(report)},
-        "render_seconds": rendering,
-    }
+    } | measured
     outputs = {
         "frames": (frames, "frames"),
         "music": (bed, "wav"),

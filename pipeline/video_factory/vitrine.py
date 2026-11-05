@@ -5,17 +5,20 @@ Its script.md has « genre: vitrine » and the settings of this video in its fro
 - « theme »: the look of the titles, captions, banner and end card (a folder of templates/hyperframes/themes/);
 - « bandeau »: the call to action in the middle, « title | text | start | length », in seconds of the video;
 - « vignette »: the text of the cover, its lines split by « | », one word between asterisks in the accent colour;
-- « vignette_image »: the second of the video whose picture carries the cover.
+- « vignette_image »: the second of the video whose picture carries the cover;
+- « icone »: the capture of the app's icon, shown on the banner and the end card;
+- « ecran_fin »: the end card's name, then its badge and the badge's icon, « name | badge | icon ».
 
 Each line of the body is one line of the voice. Its annotations place it on its shots and add no spoken word:
 - « [plan: <capture> | depuis <s> | durée <s> | voix <s>] »: a shot from a capture of the video (a plan filmed by
   `vf capture`, or a rush), from its second « depuis », for « durée » seconds; the line's voice starts « voix »
   seconds after the shot starts. Several « plan » on one line follow each other, the voice counted from the first.
 - « [jumeaux: <capture> | depuis <s> | durée <s> | voix <s> | avant <x> <y> | après <x> <y> | taille <w> <h> |
-  volet <s> <s>] »: the PR twins of a screen recording, the panes at « avant » (before) and « après » (after), both
-  « taille », shown in turn, a wipe from the first to the second at « volet » (start, length) seconds into the shot.
+  volet <s> <s> | étiquettes <before> / <after>] »: the PR twins of a screen recording, the panes at « avant »
+  (before) and « après » (after), both « taille », shown in turn under their labels, a wipe from the first to the
+  second at « volet » (start, length) seconds into the shot.
 - « [suite: voix <s>] »: the line goes on in the shot of the line before, its voice « voix » seconds after its start.
-- « [fin: voix <s>] »: the end card, until the target duration of the video.
+- « [fin: voix <s>] »: the end card, until the target duration of the video; only the last line.
 - « [appel: <icon> | <title> | <text>] »: a row of the end card, lit when the voice says the word before it.
 - « [ton: <tag>] »: a delivery tag of the voice generator (ElevenLabs), said before the next word: for `vf voix`.
 
@@ -50,6 +53,7 @@ class Piece:
     after: tuple[int, int] | None = None
     size: tuple[int, int] | None = None  # twins: width and height of each pane
     wipe: tuple[float, float] | None = None  # twins: start and length of the wipe, seconds into the shot
+    labels: tuple[str, str] | None = None  # twins: the label of each pane
 
 
 @dataclass(frozen=True)
@@ -88,6 +92,13 @@ class Cover:
 
 
 @dataclass(frozen=True)
+class EndCard:
+    name: str
+    badge: str | None
+    badge_icon: str | None
+
+
+@dataclass(frozen=True)
 class Vitrine:
     theme: str
     duration: int  # the target duration of the video, the end of the end card
@@ -95,6 +106,8 @@ class Vitrine:
     words: tuple[script.Word, ...]
     banner: Banner | None
     cover: Cover | None
+    icon: str | None = None  # the capture of the app's icon
+    end_card: EndCard | None = None
 
 
 def seconds(value: str, where: str) -> float:
@@ -115,7 +128,7 @@ def pair(values: list[str], where: str, kind=int) -> tuple:
 def options(parts: list[str], allowed: set[str], where: str) -> dict[str, list[str]]:
     """« key value… » parts of an annotation, each key once; « durée » and « après » also read without accents."""
     found: dict[str, list[str]] = {}
-    aliases = {"duree": "durée", "apres": "après"}
+    aliases = {"duree": "durée", "apres": "après", "etiquettes": "étiquettes"}
     for part in parts:
         words = part.split()
         if not words:
@@ -136,17 +149,21 @@ def piece(kind: str, content: str, where: str) -> tuple[Piece, float | None]:
     capture = parts[0]
     if not capture or " " in capture:
         raise ScriptError(f"{where} : le nom de la capture d'abord, sans espace")
-    allowed = {"depuis", "durée", "voix"} | ({"avant", "après", "taille", "volet"} if kind == "jumeaux" else set())
+    twins = {"avant", "après", "taille", "volet", "étiquettes"}
+    allowed = {"depuis", "durée", "voix"} | (twins if kind == "jumeaux" else set())
     found = options(parts[1:], allowed, where)
     start = seconds(found["depuis"][0], where) if "depuis" in found else 0.0
     length = seconds(found["durée"][0], where) if "durée" in found else None
     voice = seconds(found["voix"][0], where) if "voix" in found else None
     if kind == "plan":
         return Piece(kind, capture, start, length), voice
-    for key in ("avant", "après", "taille", "volet"):
+    for key in ("avant", "après", "taille", "volet", "étiquettes"):
         if key not in found:
             raise ScriptError(f"{where} : des jumeaux sans « {key} »")
     wipe = pair(found["volet"], where, float)
+    labels = tuple(part.strip() for part in " ".join(found["étiquettes"]).split(" / "))
+    if len(labels) != 2 or not all(labels):
+        raise ScriptError(f"{where} : « étiquettes <avant> / <après> » attendu")
     return (
         Piece(
             kind,
@@ -157,6 +174,7 @@ def piece(kind: str, content: str, where: str) -> tuple[Piece, float | None]:
             pair(found["après"], where),
             pair(found["taille"], where),
             wipe,
+            labels,
         ),
         voice,
     )
@@ -167,6 +185,14 @@ def banner(raw: str) -> Banner:
     if len(parts) != 4:
         raise ScriptError("bandeau : « titre | texte | début | durée » attendu")
     return Banner(parts[0], parts[1], seconds(parts[2], "bandeau"), seconds(parts[3], "bandeau"))
+
+
+def end_card_of(raw: str) -> EndCard:
+    parts = [part.strip() for part in raw.split(SEPARATOR)]
+    if not parts[0] or len(parts) > 3:
+        raise ScriptError("ecran_fin : « nom | badge | icône du badge » attendu, le nom d'abord")
+    parts += [""] * (3 - len(parts))
+    return EndCard(parts[0], parts[1] or None, parts[2] or None)
 
 
 def parse(text: str) -> Vitrine:
@@ -231,6 +257,9 @@ def parse(text: str) -> Vitrine:
         )
     if count != len(words):
         raise ScriptError("les mots des répliques ne sont pas ceux du script")
+    for line in lines[:-1]:
+        if line.end_card:
+            raise ScriptError(f"ligne {line.number} : seule la dernière réplique se dit sur l'écran de fin (« fin »)")
     cover = None
     if "vignette" in fields:
         at = seconds(str(fields["vignette_image"]), "vignette_image") if "vignette_image" in fields else None
@@ -242,7 +271,15 @@ def parse(text: str) -> Vitrine:
         words=words,
         banner=banner(str(fields["bandeau"])) if "bandeau" in fields else None,
         cover=cover,
+        icon=str(fields["icone"]) if "icone" in fields else None,
+        end_card=end_card_of(str(fields["ecran_fin"])) if "ecran_fin" in fields else None,
     )
+
+
+def captures(vitrine: Vitrine) -> list[str]:
+    """The captures a showcase shows: those of its shots, and its icon."""
+    names = {piece.capture for line in vitrine.lines for piece in line.pieces}
+    return sorted(names | ({vitrine.icon} if vitrine.icon else set()))
 
 
 def spoken(text: str) -> list[str]:
