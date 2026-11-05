@@ -126,7 +126,8 @@ def test_a_showcase_script_reads_line_by_line_with_its_shots_and_its_settings():
         ("Coucou. [plan: a | vitesse 2]", "ligne {0} : réglage « vitesse » inconnu (permis : depuis, durée, voix)"),
         ("Coucou. [plan: a | durée 2 | durée 3]", "ligne {0} : réglage « durée » en double"),
         ("Coucou. [plan: a | voix 1] [plan: b | voix 2]", "ligne {0} : « voix » donnée deux fois"),
-        ("Coucou. [plan: un plan]", "ligne {0} : le nom de la capture d'abord, sans espace"),
+        ("Coucou. [plan: un plan]", "ligne {0} : « un plan » : le nom de la capture d'abord, en minuscules"),
+        ("Coucou. [plan: Plan_1]", "ligne {0} : « Plan_1 » : le nom de la capture d'abord, en minuscules"),
         ("Coucou. [plan: a] [zoom]", "ligne {0} : annotation « [zoom] » inconnue dans une vitrine"),
         ("Coucou. [plan: a] [ton: excited]", "ligne {0} : un « ton » se place avant un mot de sa réplique"),
     ],
@@ -333,3 +334,48 @@ def test_the_theme_and_the_voice_come_from_the_script_not_from_the_code(tmp_path
     # The voice is the file the video registered (vf ingest --voix): the montage only names it.
     graph = montage.voice_command(Path("autre-voix.wav"), edl["spoken"], edl["duration"], Path("out.wav"))
     assert graph[:2] == ["-i", Path("autre-voix.wav")]
+
+
+def test_the_voice_of_a_line_keeps_its_padding_only_where_there_is_room():
+    # The voice opens on a silence and the first line starts with the video: no padding before it. The next two lines
+    # have no silence between them: neither takes the other's speech.
+    text = (
+        HEADER.replace("duree_visee: 20", "duree_visee: 12")
+        + "Un deux. [plan: a | durée 6]\nTrois quatre. [suite: voix 2]\nCinq. [fin]\n"
+    )
+    said = [("Un", 0.5, 0.8), ("deux.", 0.8, 1.2), ("Trois", 1.2, 1.5), ("quatre.", 1.5, 1.9), ("Cinq.", 3.0, 3.4)]
+    words = [{"text": t, "start": a, "end": b} for t, a, b in said]
+    edl = montage.decide(vitrine.parse(text), words, [[0.0, 0.5], [1.9, 3.0]], 3.6, {})
+    assert [(s["source_start"], s["source_end"], s["at"]) for s in edl["spoken"]] == [
+        (0.5, 1.2, 0.0),
+        (1.2, 1.9, 2.0),
+        (3.0, 3.6, 6.0),
+    ]
+    graph = montage.voice_command(Path("voix.wav"), edl["spoken"], edl["duration"], Path("out.wav"))[3]
+    assert re.findall(r"atrim=([0-9.]+):([0-9.]+),", graph) == [
+        ("0.500", "1.200"),
+        ("1.200", "2.020"),
+        ("2.940", "3.720"),
+    ]
+    assert [int(delay) for delay in re.findall(r"adelay=(\d+)", graph)] == [0, 2000, 5940]
+
+
+@pytest.mark.parametrize(
+    ("lines", "message"),
+    [
+        (
+            "Un deux. [plan: a | durée 6]\nTrois quatre. [suite: voix 0,5]\nCinq. [fin]\n",
+            "après le début de la réplique",
+        ),
+        (
+            "Un deux. [plan: a | durée 6]\nTrois quatre. [suite: voix 2]\nCinq. [fin: voix 5,9]\n",
+            "après la fin de la vidéo",
+        ),
+    ],
+)
+def test_a_line_whose_voice_would_overlap_the_next_one_or_end_after_the_video_is_refused(lines, message):
+    said = [("Un", 0.5, 0.8), ("deux.", 0.8, 1.2), ("Trois", 1.2, 1.5), ("quatre.", 1.5, 1.9), ("Cinq.", 3.0, 3.4)]
+    words = [{"text": t, "start": a, "end": b} for t, a, b in said]
+    text = HEADER.replace("duree_visee: 20", "duree_visee: 12") + lines
+    with pytest.raises(montage.MontageError, match=message):
+        montage.decide(vitrine.parse(text), words, [[0.0, 0.5], [1.9, 3.0]], 3.6, {})

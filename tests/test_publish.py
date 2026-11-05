@@ -117,3 +117,12 @@ def test_an_ai_voice_is_said_in_the_caption_and_the_ai_label_is_recalled(video, 
         "Étiquette IA à activer sur TikTok, YouTube et Instagram : voix générée par ElevenLabs"
         in capsys.readouterr().out
     )
+
+
+def test_a_cover_the_script_no_longer_asks_for_is_removed(video):
+    _folder, media, state = video
+    folder = media / "publication" / "essai"
+    folder.mkdir(parents=True)
+    (folder / publish.COVER_NAME).write_bytes(b"ancienne vignette")
+    publish.write(publish.prepare(state, SHOWCASE.replace("genre: vitrine\n", ""), media), media, "essai")
+    assert not (folder / publish.COVER_NAME).exists()

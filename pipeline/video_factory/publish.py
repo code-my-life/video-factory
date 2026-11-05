@@ -180,6 +180,8 @@ def link(source: Path, target: Path) -> None:
 def write(publication: Publication, media: Path, video_id: str) -> Path:
     folder = media / FOLDER / video_id
     folder.mkdir(parents=True, exist_ok=True)
+    # The cover is made after the files; one left by an earlier version of the script never stays.
+    (folder / COVER_NAME).unlink(missing_ok=True)
     for name, source in publication.sources.items():
         link(source, folder / FILES[name])
     (folder / CAPTION_NAME).write_text(publication.caption, encoding="utf-8")

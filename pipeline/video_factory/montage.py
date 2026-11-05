@@ -218,6 +218,15 @@ def decide(
     the script words of `align` (seconds of the voice), silences and length those of `transcribe`."""
     shots, starts = timeline(vitrine, lengths)
     lines = spoken(vitrine, starts, words, silences, length)
+    for line, following in zip(lines, [*lines[1:], None], strict=True):
+        ends = line.at + line.source_end - line.source_start
+        number = vitrine.lines[line.line].number
+        if ends > vitrine.duration + 1e-6:
+            raise MontageError(f"ligne {number} : sa voix finirait à {ends:.2f} s, après la fin de la vidéo")
+        if following is not None and ends > following.at + 1e-6:
+            raise MontageError(
+                f"ligne {number} : sa voix finirait à {ends:.2f} s, après le début de la réplique suivante"
+            )
     placed = placed_words(vitrine, lines, words)
     banner = vitrine.banner
     end = shots[-1] if shots and shots[-1].piece is None else None
@@ -249,11 +258,15 @@ def decide(
 
 def voice_command(source: Path, lines: Sequence[dict], duration: float, output: Path) -> list[str | Path]:
     """The ffmpeg arguments of the voice on the video's time line: each line's stretch with PAD_IN and PAD_OUT, faded
-    in and out, delayed to its place, all mixed without normalization into one mono track of the video's length."""
+    in and out, delayed to its place, all mixed without normalization into one mono track of the video's length. The
+    padding never takes the speech of the lines around it, nor starts before the video."""
     chains, labels = [], []
     for index, line in enumerate(lines):
         start, end, at = line["source_start"], line["source_end"], line["at"]
-        cut_start, cut_end = max(0.0, start - PAD_IN), end + PAD_OUT
+        before = lines[index - 1]["source_end"] if index > 0 else 0.0
+        after = lines[index + 1]["source_start"] if index + 1 < len(lines) else end + PAD_OUT
+        cut_start = max(0.0, before, start - min(PAD_IN, at))
+        cut_end = max(end, min(end + PAD_OUT, after))
         delay = round((at - (start - cut_start)) * 1000)
         if delay < 0:
             raise MontageError(f"réplique {index + 1} : sa voix commencerait avant le début de la vidéo")

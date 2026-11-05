@@ -64,7 +64,7 @@ def stem_of(name: str) -> str:
     """The name of a received file without its extension, in lower case letters, digits and hyphens: a showcase stores
     a rush under it, as the capture its script names."""
     found = re.sub(r"[^a-z0-9]+", "-", Path(urllib.parse.unquote(name)).stem.lower()).strip("-")
-    return found[:60].strip("-") or "fichier"
+    return found[:60].strip("-") or "fichier"  # the alphabet and length of a capture's name (vitrine.CAPTURE_NAME)
 
 
 def layout(title: str, body: str) -> bytes:

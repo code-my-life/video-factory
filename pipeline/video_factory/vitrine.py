@@ -34,6 +34,8 @@ from video_factory import frontmatter, script
 from video_factory.script import ANNOTATION, ScriptError
 
 NUMBER = re.compile(r"^[0-9]+(?:[.,][0-9]+)?$")
+# A capture's name, as the studio page also writes it from the name of a received file.
+CAPTURE_NAME = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$")
 SEPARATOR = "|"
 PIECES = ("plan", "jumeaux")
 MODELS = ("v3", "v2")
@@ -147,8 +149,8 @@ def options(parts: list[str], allowed: set[str], where: str) -> dict[str, list[s
 def piece(kind: str, content: str, where: str) -> tuple[Piece, float | None]:
     parts = [part.strip() for part in content.split(SEPARATOR)]
     capture = parts[0]
-    if not capture or " " in capture:
-        raise ScriptError(f"{where} : le nom de la capture d'abord, sans espace")
+    if not CAPTURE_NAME.match(capture):
+        raise ScriptError(f"{where} : « {capture} » : le nom de la capture d'abord, en minuscules, chiffres et tirets")
     twins = {"avant", "après", "taille", "volet", "étiquettes"}
     allowed = {"depuis", "durée", "voix"} | (twins if kind == "jumeaux" else set())
     found = options(parts[1:], allowed, where)
@@ -185,6 +187,15 @@ def banner(raw: str) -> Banner:
     if len(parts) != 4:
         raise ScriptError("bandeau : « titre | texte | début | durée » attendu")
     return Banner(parts[0], parts[1], seconds(parts[2], "bandeau"), seconds(parts[3], "bandeau"))
+
+
+def icon_of(fields: dict) -> str | None:
+    if "icone" not in fields:
+        return None
+    name = str(fields["icone"])
+    if not CAPTURE_NAME.match(name):
+        raise ScriptError(f"icone : « {name} » : le nom d'une capture, en minuscules, chiffres et tirets")
+    return name
 
 
 def end_card_of(raw: str) -> EndCard:
@@ -271,7 +282,7 @@ def parse(text: str) -> Vitrine:
         words=words,
         banner=banner(str(fields["bandeau"])) if "bandeau" in fields else None,
         cover=cover,
-        icon=str(fields["icone"]) if "icone" in fields else None,
+        icon=icon_of(fields),
         end_card=end_card_of(str(fields["ecran_fin"])) if "ecran_fin" in fields else None,
     )
 
