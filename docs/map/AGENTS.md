@@ -11,7 +11,7 @@ Covered roots: `pipeline/`, `hermes/`, `vitrine/`, `templates/`, `.claude/skills
 - `objects/studio/`: the Hermès board « studio » (#7): its stations, the board through the Hermès CLI, the lanes, the writer, the messages, the page and the service, and `hermes/` (manifest, profile, install).
 - `objects/toolchain/`: the lock of external tools, the npm lockfiles of HyperFrames and Playwright, and the render image.
 - `objects/contracts/`: the schemas this repository publishes (state, script, capture plan and source).
-- `objects/templates/`: the script template, the HyperFrames project templates of `compose`, the registry items restyled for it, and the camera follow scene of `vf capture`.
+- `objects/templates/`: the script template, the HyperFrames project templates of `compose`, the registry items restyled for it, and the scenes of `vf capture` (camera follow, phone).
 - `objects/skills/`: the agent skills shipped with this repository (`video-factory` and four internal skills of HyperFrames).
 - `objects/barriers/`: what keeps content out and conventions in (no-content check, workflows, tests).
 - `objects/project/`: the Python project definition.

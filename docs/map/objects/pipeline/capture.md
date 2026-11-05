@@ -9,6 +9,7 @@ hits:
   - schemas/capture-plan.schema.json
   - schemas/capture-source.schema.json
   - templates/hyperframes/camera-follow/
+  - templates/hyperframes/phone/
   - tests/test_capture.py
   - docs/RUNBOOK.md
   - .claude/skills/video-factory/SKILL.md
@@ -16,7 +17,7 @@ hits:
 
 # capture
 
-The `vf capture` package: an app's real demo, driven frame by frame on a fake clock, and the camera that follows one of its elements (#19, ADR 0005). `plan` reads and checks a capture plan and the app's pinned source (a refused plan names each field at fault); `demo` fetches the pinned commit alone into a work folder, applies the scenario variant with `git apply` and builds with the lock's Node.js, keyed by everything the build depends on; `shoot` runs `driver.mjs` with the pinned Node.js, Playwright and Chromium and fingerprints every frame and the track (`empreintes.json`); `camera` turns the track into a path (target, anchor, stage clamp, dead zone, fixed-length cubic moves, holds); `scene` writes the « camera follow » project, checks it, renders it in the pinned image without the network and measures it (`mesures.json`).
+The `vf capture` package: an app's real demo, driven frame by frame on a fake clock, and the camera that follows one of its elements (#19, ADR 0005). `plan` reads and checks a capture plan and the app's pinned source (a refused plan names each field at fault); `demo` fetches the pinned commit alone into a work folder, applies the scenario variant with `git apply` and builds with the lock's Node.js, keyed by everything the build depends on; `shoot` runs `driver.mjs` with the pinned Node.js, Playwright and Chromium and fingerprints every frame and the track (`empreintes.json`); `camera` turns the track into a path (target, anchor, stage clamp, dead zone, fixed-length cubic moves, holds, and the cuts of #22: another target or scale, a wide shot, a hold); `scene` writes the « camera follow » project with its cursor, or the « phone » project of an iPhone plan ([phone](../templates/phone.md)), checks it, renders it in the pinned image without the network and measures it (`mesures.json`). The driver also scrolls on the fake clock and records where each click lands.
 
 ## Why this shape
 

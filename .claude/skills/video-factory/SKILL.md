@@ -99,7 +99,7 @@ download), install it, and say in the docs what it is for.
 Showcase videos show the real app, never a mock-up (#19, ADR 0005). `uv run vf capture <plan.json>` builds the app's
 demo at its pinned commit with its scenario variant (`vitrine/<app>/source.json`, `scenario.patch`), drives it frame by
 frame and, when the plan has a camera, writes, checks, renders and measures the `templates/hyperframes/camera-follow/`
-scene. The plans live in `vitrine/<app>/plans/` (schema `schemas/capture-plan.schema.json`); the output goes to
+scene (the `phone/` scene for an iPhone plan with a `phone` block, #22). The plans live in `vitrine/<app>/plans/` (schema `schemas/capture-plan.schema.json`); the output goes to
 `VF_MEDIA/vitrine/<plan>/` (`frames/`, `track.json`, `empreintes.json`, `scene/`, `mesures.json`, `<plan>.mp4`).
 
 The method, each point learned on the test shot:
@@ -132,6 +132,18 @@ The method, each point learned on the test shot:
 - **Motion blur by accumulation**: `data-motion-blur` of HyperFrames 0.9.12 skips a layer that moves over the whole
   frame, so the scene stacks copies of the camera layer, each a fraction of a frame behind, at 1/(k+1). The trailing
   copies are hidden during the holds, so the blur costs only during the moves (the RUNBOOK gives the measured cost).
+- **Scroll with a `scroll` action**, never with the browser's smooth scroll (it runs in real time): the driver eases
+  the scroller on the fake clock. A page scrolls only to its bottom: aim near the top with `offset`, then read where it
+  stopped (`result.to` in `track.json`).
+- **Change the camera's target with `camera.cuts`**: another element, scale or anchor at a scenario time, in one move.
+  A `hold` freezes the camera while the page scrolls under it; a scale under 1.6 (or `fit`) is a wide shot, left out
+  of the 26 px rule. The graph's stage at the app's zoom 1 is only 1118 CSS px high, less than a scale-2 frame: shoot
+  close-ups at zoom 1.3 and pull back to about 1.4, not to the whole graph (bands of ground otherwise).
+- **Clicks and taps show**: the scene draws a big cursor (6 % of the frame's height) for a click, a finger for a tap,
+  from the target rectangle the driver records; `"cursor": false` hides one (a second tap at the same instant).
+- **An iPhone plan gets a `phone` block**: the capture as the screen of a generic 3D phone, eased poses, a
+  notification. Keep what matters above the subtitle band (y 1424): lift the phone (`y`) while the action is low on
+  its screen.
 - **Same plan, same bytes is the goal**: compare the `empreintes.json` « all » of two captures. Two captures still
   drift (on plan 3, a tenth of a CSS pixel on Motion animations from frame 76, a few hundred pixels
   around spinners), so something still reads a real time: a rendering frame of Chrome or a ResizeObserver are the

@@ -24,3 +24,13 @@ Les vidéos vitrine de factory-live montrent la vraie app en action. Un plan d'e
 - Un plan tourné en x3 pèse : 270 images de 4320x4800 font environ 300 Mo de PNG, sur le disque de WSL ; sa capture prend 5 à 7 minutes (le pas d'une milliseconde en est la moitié). Le rendu de la scène se fait dans l'image figée, son dossier de travail monté depuis ce disque, jamais dans celui de Docker.
 - Le flou par accumulation coûte des copies à rendre ; il est limité aux mouvements, et son coût est noté dans le RUNBOOK.
 - Une autre app de vitrine se filme en ajoutant son dossier `vitrine/<app>/` ; une nouvelle version de factory-live, en changeant le commit de `source.json` et en refaisant la variante dessus.
+
+## Complément du 2026-11-05 : les plans de la vidéo 1 (#22)
+
+- **Le défilement est un geste du plan** (`scroll`), mené par l'horloge simulée sur une courbe cubique : un défilement doux du navigateur suivrait le temps réel. Il fait défiler le conteneur qui défile autour de l'élément visé, sinon la page.
+- **La caméra a des coupes** (`camera.cuts`) : une autre cible, échelle ou ancre à un instant du scénario, toujours en un mouvement cubique sans dépassement ; l'échelle va de l'une à l'autre en progression géométrique, pour un zoom régulier. Une coupe peut figer la caméra (pendant un défilement, la page défile dans un cadre fixe, comme sous le pouce) ou reculer en plan large (sous 1,6, ou toute la scène) ; la règle des 26 px ne mesure pas les plans larges, qui ne se lisent pas.
+- **Le curseur et le doigt** sont dessinés par la scène, pas par le navigateur : le pilote relève le rectangle de la cible de chaque clic, et la position du curseur est calculée image par image en Python, sur la pose de la caméra. Il fait 6 % de la hauteur du cadre (la SPEC demande 4 à 7 %).
+- **Un plan à l'iPhone a sa scène « téléphone »** : l'écran capturé (x3) dans un téléphone générique en 3D en CSS (un corps, une tranche en couches, un trou d'appareil photo), des poses lissées par GSAP, un doigt sur chaque toucher, une notification avec l'icône de l'app. Aucune forme ni marque d'un vrai modèle.
+- **La variante de factory-live fait écrire la gate** de claude-cockpit#73 (run 187) dans sa transcription, une entrée toutes les 0,25 s à partir de 67,2 s : le plan 4 montre une transcription qui défile en direct. Les tests de factory-live passent sur la variante (38 fichiers, 286 tests).
+- **Le plan 7 ne recule pas sur tout le graphe** : au zoom 1 de l'app, la scène du graphe ne fait que 1118 px de haut, moins que le cadre d'une caméra à l'échelle 2 ; il est tourné au zoom 1,3, centré sur la colonne de droite, et recule à l'échelle 1,4, qui garde les bandes vides sous 10 %.
+
