@@ -1,0 +1,34 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "plan7-recul",
+  "about": "Vidéo 1, plan 7 : claude-cockpit#73 passe la CI de main et le déploiement, puis la caméra recule sur le graphe, factory-live#2 repartie, et l'issue arrive à Terminé.",
+  "app": "factory-live",
+  "device": "desktop",
+  "window": { "width": 1440, "height": 1600 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 79, "end": 89 },
+  "actions": [
+    { "at": 75, "do": "click", "selector": "a:has-text(\"Interventions\") >> visible=true" },
+    { "at": 75.5, "do": "click", "selector": "text=Le contrôle de coder-guard" },
+    { "at": 76, "do": "click", "selector": "button[type=\"submit\"]:has-text(\"Débloquer\") >> visible=true" },
+    { "at": 76.5, "do": "click", "selector": "a:has-text(\"Ligne d’usine\") >> visible=true" },
+    { "at": 77, "do": "click", "selector": "[data-issue=\"claude-cockpit#73\"]" },
+    { "at": 77.5, "do": "zoom", "scale": 1.3, "x": 760, "y": 560, "measure": "[data-box=\"brief\"]" },
+    { "at": 77.5, "do": "scroll", "selector": "[data-box=\"review\"]", "left": 560, "duration": 0.5 }
+  ],
+  "stage": "section:has([data-box]) > div",
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box", "flags": ["data-arriving"] }
+  },
+  "camera": {
+    "follow": "issue",
+    "arriving": "data-arriving",
+    "scale": 2,
+    "move": 0.5,
+    "anchor": { "x": 0.5, "y": 0.45 },
+    "cuts": [{ "at": 84.6, "scale": 1.5, "anchor": { "x": 0.5, "y": 0.5 }, "move": 1.0 }],
+    "labels": { "ci": "La CI de main", "deploy": "Le déploiement", "done": "Terminé" }
+  }
+}

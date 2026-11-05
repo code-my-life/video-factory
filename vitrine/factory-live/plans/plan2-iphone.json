@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "plan2-iphone",
+  "about": "Vidéo 1, plan 2 : le téléphone entre en 3D et se pose, factory-live ouvert sur la ligne d'usine, où claude-cockpit#73 quitte le brief.",
+  "app": "factory-live",
+  "device": "iphone",
+  "window": { "width": 390, "height": 844 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 54.5, "end": 59.5 },
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box" }
+  },
+  "texts": false,
+  "phone": {
+    "keys": [
+      { "t": 0, "scale": 1.5, "rx": 18, "ry": -28, "rz": 4, "y": 260 },
+      { "t": 1.6, "scale": 2.2, "rx": 4, "ry": -8, "rz": 0, "y": 110 },
+      { "t": 5, "scale": 2.35, "rx": 0, "ry": 0, "rz": 0, "y": 90 }
+    ]
+  }
+}

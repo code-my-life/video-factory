@@ -43,14 +43,14 @@ def modules(*names: str) -> tuple[str, ...]:
     return tuple(f"{PACKAGE}/{name}.py" for name in (*names, "steps"))
 
 
-# The project templates and the registry items of compose: every file counts in its fingerprint, except the scene of
-# `vf capture` (camera-follow/), which compose never reads.
-CAPTURE_SCENE = REPO_ROOT / "templates" / "hyperframes" / "camera-follow"
+# The project templates and the registry items of compose: every file counts in its fingerprint, except the scenes of
+# `vf capture` (camera-follow/, phone/), which compose never reads.
+CAPTURE_SCENES = tuple(REPO_ROOT / "templates" / "hyperframes" / name for name in ("camera-follow", "phone"))
 TEMPLATE = tuple(
     sorted(
         path.relative_to(REPO_ROOT).as_posix()
         for path in (REPO_ROOT / "templates" / "hyperframes").rglob("*")
-        if path.is_file() and not path.is_relative_to(CAPTURE_SCENE)
+        if path.is_file() and not any(path.is_relative_to(scene) for scene in CAPTURE_SCENES)
     )
 )
 LIBRARIES = ("gsap", "lottie-web", "dotlottie-web", "animejs", "three")

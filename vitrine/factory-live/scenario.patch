@@ -25,13 +25,13 @@ index b93b1f3..c15a897 100644
      {
        key: KEYS.projects,
 diff --git a/apps/web/src/demo/script.ts b/apps/web/src/demo/script.ts
-index 38d8f14..108951d 100644
+index 38d8f14..faba02a 100644
 --- a/apps/web/src/demo/script.ts
 +++ b/apps/web/src/demo/script.ts
 @@ -1,5 +1,5 @@
  import { msg } from '@factory-live/contracts';
 -import type { ActivityEvent } from '@factory-live/contracts';
-+import type { ActivityEvent, PullRequestView } from '@factory-live/contracts';
++import type { ActivityEvent, PullRequestView, TranscriptEntry } from '@factory-live/contracts';
  import { NEMOTRON_SUPER, QWEN_LOCAL, limitsOf, model } from './catalog.ts';
  import { contactAcceptance } from './acceptance.ts';
  import { answered, hookTimeoutDiagnosis } from './diagnoses.ts';
@@ -43,7 +43,7 @@ index 38d8f14..108951d 100644
  } from './state.ts';
  import type { DemoState } from './state.ts';
  
-@@ -294,6 +295,331 @@ function hookTimeoutFix(): ScenarioStep[] {
+@@ -294,6 +295,405 @@ function hookTimeoutFix(): ScenarioStep[] {
    return [fix(HOOK_FIX_AT, false), fix(HOOK_REPO_AT, true)];
  }
  
@@ -91,6 +91,56 @@ index 38d8f14..108951d 100644
 +    durationMs: step.durationMs,
 +    model: NEMOTRON_SUPER,
 +  });
++}
++
++const SHORTCUT_GATE_RUN = 187;
++/** What the gate writes on claude-cockpit#73, word for word, one entry every 0.25 s from 65 s. */
++const SHORTCUT_GATE_WORDS: [
++  TranscriptEntry['role'],
++  string,
++  string | null,
++  TranscriptEntry['status'],
++][] = [
++  ['assistant', `Je prends la PR #${SHORTCUT_PR}, branche feat/73-quick-reply.`, null, null],
++  ['tool_call', 'git fetch origin feat/73-quick-reply', 'terminal', null],
++  ['tool_result', 'feat/73-quick-reply -> FETCH_HEAD', 'terminal', 'ok'],
++  [
++    'assistant',
++    'Je relis le brief : le test fail-first est desktop/test/quick-reply.test.js.',
++    null,
++    null,
++  ],
++  ['tool_call', 'sed -n 1,40p brief.md', 'terminal', null],
++  ['tool_result', 'Test : ⌘J répond à la dernière question de l’agent.', 'terminal', 'ok'],
++  ['tool_call', 'npm ci', 'terminal', null],
++  ['tool_result', 'added 412 packages in 21s', 'terminal', 'ok'],
++  ['assistant', 'Je rejoue le test sur la base : il doit échouer.', null, null],
++  ['tool_call', 'git stash && npm test -- quick-reply', 'terminal', null],
++  ['tool_result', '1 failing : ⌘J ne répond pas à la dernière question', 'terminal', 'error'],
++  ['assistant', 'Rouge sur la base, comme attendu. Je le lance sur la PR.', null, null],
++  ['tool_call', 'npm test -- quick-reply', 'terminal', null],
++  ['tool_result', '4 passing', 'terminal', 'ok'],
++  ['tool_call', 'npm run typecheck', 'terminal', null],
++  ['tool_result', 'tsc --noEmit : 0 erreur', 'terminal', 'ok'],
++  ['tool_call', `gh pr checks ${SHORTCUT_PR} --watch`, 'terminal', null],
++  ['tool_result', 'All checks were successful', 'terminal', 'ok'],
++  ['assistant', 'Le test échoue sur la base et passe sur la PR, checks verts.', null, null],
++  ['assistant', `J’approuve la PR #${SHORTCUT_PR}.`, null, null],
++];
++
++function shortcutGateTranscript(): ScenarioStep[] {
++  return SHORTCUT_GATE_WORDS.map(([role, text, toolName, status], index) => ({
++    at: Math.round((65 + index * 0.25) * 100) / 100,
++    run: (state, now) =>
++      appendTranscript(state, SHORTCUT_GATE_RUN, 'hermes', {
++        at: iso(now),
++        role,
++        text,
++        toolName,
++        model: role === 'assistant' ? NEMOTRON_SUPER : null,
++        status,
++      }),
++  }));
 +}
 +
 +function shortcutPr(state: DemoState): PullRequestView {
@@ -184,8 +234,31 @@ index 38d8f14..108951d 100644
 +          runStartedAt: iso(now),
 +          lastHeartbeatAt: iso(now),
 +        });
++        state.transcripts[SHORTCUT_GATE_RUN] = [
++          {
++            runId: SHORTCUT_GATE_RUN,
++            source: 'hermes',
++            title: msg('transcript.hermes', { profile: 'gate', session: null }),
++            name: null,
++            startedAt: now,
++            endedAt: null,
++            costUsd: null,
++            entries: [
++              {
++                id: `tr-${SHORTCUT_GATE_RUN}-0`,
++                at: iso(now),
++                role: 'user',
++                text: `work kanban task ${CARDS.shortcutImpl}`,
++                toolName: null,
++                model: null,
++                status: null,
++              },
++            ],
++            terminal: [],
++          },
++        ];
 +        addRun(state, KEYS.shortcut, CARDS.shortcutImpl, {
-+          id: 187,
++          id: SHORTCUT_GATE_RUN,
 +          profile: 'gate',
 +          role: 'reviewer',
 +          status: 'running',
@@ -219,6 +292,7 @@ index 38d8f14..108951d 100644
 +      },
 +    },
 +    ...toolLoop(SHORTCUT_GATE, 64, 1.5, 68.5, gateShortcutStep),
++    ...shortcutGateTranscript(),
 +    {
 +      at: 70,
 +      run: (state, now) => {
@@ -375,7 +449,7 @@ index 38d8f14..108951d 100644
  export function buildScript(): ScenarioStep[] {
    const steps: ScenarioStep[] = [
      ...toolLoop(CLAUDE_LANE, 3, 4, 36, claudeLaneStep),
-@@ -442,6 +768,7 @@ export function buildScript(): ScenarioStep[] {
+@@ -442,6 +842,7 @@ export function buildScript(): ScenarioStep[] {
            costUsd: null,
          });
          patchIssue(state, KEYS.shortcut, {
@@ -383,7 +457,7 @@ index 38d8f14..108951d 100644
            status: 'active',
            activeProfiles: ['coordinator'],
            updatedAt: iso(now),
-@@ -838,7 +1165,7 @@ export function buildScript(): ScenarioStep[] {
+@@ -838,7 +1239,7 @@ export function buildScript(): ScenarioStep[] {
        },
      },
      {
@@ -392,7 +466,7 @@ index 38d8f14..108951d 100644
        run: (state, now) => {
          patchAgent(state, 'coder', {
            model: model('freellmapi', 'dots3-note-preview', 'live'),
-@@ -871,7 +1198,8 @@ export function buildScript(): ScenarioStep[] {
+@@ -871,7 +1272,8 @@ export function buildScript(): ScenarioStep[] {
          });
        },
      },

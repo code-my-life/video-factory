@@ -65,7 +65,8 @@
       "items": {
         "oneOf": [
           { "$ref": "#/$defs/zoom" },
-          { "$ref": "#/$defs/click" }
+          { "$ref": "#/$defs/click" },
+          { "$ref": "#/$defs/scroll" }
         ]
       },
       "default": []
@@ -96,7 +97,8 @@
       "type": "boolean",
       "default": true
     },
-    "camera": { "$ref": "#/$defs/camera" }
+    "camera": { "$ref": "#/$defs/camera" },
+    "phone": { "$ref": "#/$defs/phone" }
   },
   "$defs": {
     "at": { "type": "number", "minimum": 0, "maximum": 600 },
@@ -126,7 +128,45 @@
       "properties": {
         "at": { "$ref": "#/$defs/at" },
         "do": { "enum": ["click", "tap"] },
-        "selector": { "type": "string", "minLength": 1 }
+        "selector": { "type": "string", "minLength": 1 },
+        "cursor": {
+          "description": "Dessiner le curseur (à l'ordinateur) ou le doigt (à l'iPhone) qui fait ce geste.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "scroll": {
+      "description": "Un défilement mené par l'horloge simulée : l'élément du sélecteur vient à offset pixels CSS sous le haut de la fenêtre, en duration secondes, sur une courbe cubique. Défile le conteneur qui défile autour de lui, sinon la page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "do", "selector"],
+      "properties": {
+        "at": { "$ref": "#/$defs/at" },
+        "do": { "const": "scroll" },
+        "selector": { "type": "string", "minLength": 1 },
+        "offset": {
+          "description": "Pixels CSS sous le haut de la fenêtre (120 par défaut, sauf pour un défilement seulement horizontal).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2560
+        },
+        "left": {
+          "description": "Défilement horizontal : le bord gauche de l'élément vient à left pixels CSS du bord gauche de la fenêtre, dans le conteneur qui défile de côté autour de lui.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2560
+        },
+        "duration": { "type": "number", "minimum": 0.2, "maximum": 3, "default": 0.6 }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "camera": {
@@ -177,11 +217,70 @@
           },
           "default": { "copies": 6, "shutter": 0.5 }
         },
+        "cuts": {
+          "description": "Les changements de cible de la caméra, chacun à son instant du scénario : un autre élément suivi, une autre échelle, une autre ancre. Sous 1,6, c'est un plan large, hors de la règle des 26 px ; « fit » recule jusqu'à montrer toute la scène. La caméra y va en un mouvement de move secondes.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["at"],
+            "properties": {
+              "at": { "$ref": "#/$defs/at" },
+              "follow": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "scale": { "oneOf": [{ "type": "number", "minimum": 1, "maximum": 2 }, { "const": "fit" }] },
+              "anchor": { "$ref": "#/$defs/anchor" },
+              "move": { "type": "number", "minimum": 0.4, "maximum": 1.2 },
+              "hold": {
+                "description": "La caméra se fige là où elle est, quoi que fasse sa cible (pendant un défilement de la page, par exemple).",
+                "type": "boolean"
+              }
+            }
+          },
+          "default": []
+        },
         "labels": {
           "description": "Un titre par groupe de l'élément suivi (sa station, par exemple), tenu tant qu'il y est, dans la bande des sous-titres.",
           "type": "object",
           "propertyNames": { "minLength": 1 },
           "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    },
+    "phone": {
+      "description": "La scène « téléphone » d'un plan à l'iPhone : l'écran capturé dans un téléphone générique en 3D, dans le cadre 1440x2560, avec le doigt de chaque toucher et, s'il y en a une, une notification qui tombe sur l'écran.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys"],
+      "properties": {
+        "keys": {
+          "description": "Les poses du téléphone, en secondes du plan : scale (pixels du cadre par pixel CSS de l'écran), rx, ry, rz (degrés), y (décalage vertical, pixels du cadre). Entre deux poses, une courbe cubique ; avant la première et après la dernière, il tient.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["t"],
+            "properties": {
+              "t": { "type": "number", "minimum": 0 },
+              "scale": { "type": "number", "minimum": 0.5, "maximum": 3 },
+              "rx": { "type": "number", "minimum": -60, "maximum": 60 },
+              "ry": { "type": "number", "minimum": -60, "maximum": 60 },
+              "rz": { "type": "number", "minimum": -30, "maximum": 30 },
+              "y": { "type": "number", "minimum": -2560, "maximum": 2560 }
+            }
+          }
+        },
+        "notification": {
+          "description": "Une notification qui tombe en haut de l'écran à at (secondes du plan) et repart au premier toucher qui suit, ou après 4 s.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["at", "title", "text"],
+          "properties": {
+            "at": { "type": "number", "minimum": 0 },
+            "app": { "type": "string", "minLength": 1, "maxLength": 30, "default": "factory-live" },
+            "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+            "text": { "type": "string", "minLength": 1, "maxLength": 160 }
+          }
         }
       }
     }

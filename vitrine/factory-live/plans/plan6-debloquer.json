@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "plan6-debloquer",
+  "about": "Vidéo 1, plan 6 : sur l'iPhone, la notification du blocage de factory-live#2 tombe, le doigt l'ouvre, la question de l'agent, « Débloquer » avec la réponse préremplie, puis le suivi jusqu'à la carte repartie.",
+  "app": "factory-live",
+  "device": "iphone",
+  "window": { "width": 390, "height": 844 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 72.5, "end": 84.5 },
+  "actions": [
+    { "at": 74.6, "do": "tap", "selector": "a:has-text(\"Interventions\") >> visible=true" },
+    { "at": 74.62, "do": "tap", "selector": "text=Le contrôle de coder-guard", "cursor": false },
+    { "at": 77.0, "do": "scroll", "selector": "button[type=\"submit\"]:has-text(\"Débloquer\") >> visible=true", "offset": 330, "duration": 0.8 },
+    { "at": 78.4, "do": "tap", "selector": "button[type=\"submit\"]:has-text(\"Débloquer\") >> visible=true" }
+  ],
+  "track": {
+    "title": { "selector": "h1" }
+  },
+  "texts": false,
+  "phone": {
+    "keys": [
+      { "t": 0, "scale": 2.2, "rx": 6, "ry": -10, "rz": 0, "y": 110 },
+      { "t": 1.2, "scale": 2.2, "rx": 0, "ry": 0, "rz": 0, "y": 110 },
+      { "t": 4.4, "scale": 2.2, "rx": 0, "ry": 0, "rz": 0, "y": 110 },
+      { "t": 5.2, "scale": 2.2, "rx": 0, "ry": 0, "rz": 0, "y": -250 },
+      { "t": 6.4, "scale": 2.2, "rx": 0, "ry": 0, "rz": 0, "y": -250 },
+      { "t": 7.2, "scale": 2.2, "rx": 0, "ry": 0, "rz": 0, "y": 110 },
+      { "t": 12, "scale": 2.25, "rx": 0, "ry": 0, "rz": 0, "y": 100 }
+    ],
+    "notification": {
+      "at": 0.5,
+      "title": "Outil ou accès manquant",
+      "text": "factory-live#2 : le contrôle de coder-guard dépasse le délai des hooks d'Hermès (30 s)"
+    }
+  }
+}
