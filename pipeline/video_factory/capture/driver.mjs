@@ -86,6 +86,9 @@ await context.addInitScript((storage) => {
   // CSS animations and transitions run on the real document timeline: each one is paused as soon as it is seen, as
   // starting at that fake instant, and set from the fake clock from then on. The driver calls this after every step
   // of the clock, so even a short animation is caught before it could end in real time.
+  // The element that scrolls the page: the one a scroll action marked (the nearest ancestor of its target that
+  // scrolls), else the document.
+  window.__vfScroller = () => document.querySelector('[data-vf-scroller]') ?? document.scrollingElement;
   window.__vfPin = () => {
     const now = Date.now();
     for (const animation of document.getAnimations()) {
@@ -126,11 +129,23 @@ async function settle() {
       }),
   );
 }
+// A scroll in progress: the page's scroller moved along a cubic ease-in-out, set after every step of the fake clock
+// (a smooth scroll of the browser would run on the real time).
+let scrolling = null;
+const easeInOut = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
+async function applyScroll() {
+  if (!scrolling) return;
+  const progress = (elapsed - scrolling.start) / scrolling.duration;
+  const y = scrolling.from + (scrolling.to - scrolling.from) * easeInOut(progress);
+  await page.evaluate(({ y }) => window.__vfScroller().scrollTop = y, { y });
+  if (progress >= 1) scrolling = null;
+}
 async function runTo(ms) {
   while (elapsed < ms) {
     const next = Math.min(ms, elapsed + STEP_MS);
     await page.clock.runFor(next - elapsed);
     elapsed = next;
+    await applyScroll();
     await settle();
   }
 }
@@ -156,12 +171,46 @@ async function zoom(action) {
   return { from: before, to: await scaleOf(measure) };
 }
 
+// A scroll brings an element to `offset` CSS pixels below the top of the window, in `duration` seconds.
+async function scroll(action) {
+  const box = await page.locator(action.selector).first().boundingBox();
+  if (!box) throw new Error(`défilement : « ${action.selector} » n'est pas affiché`);
+  const from = await page.locator(action.selector).first().evaluate((element) => {
+    document.querySelector('[data-vf-scroller]')?.removeAttribute('data-vf-scroller');
+    for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) {
+        node.setAttribute('data-vf-scroller', '');
+        break;
+      }
+    }
+    return window.__vfScroller().scrollTop;
+  });
+  const to = Math.max(0, from + box.y - (action.offset ?? 120));
+  scrolling = { start: elapsed, duration: Math.max(1, (action.duration ?? 0.6) * 1000), from, to };
+  return { from, to };
+}
+
+// A gesture that fails leaves a picture of the page as it was (erreur.png), to see why.
 async function act(action) {
+  try {
+    return await gesture(action);
+  } catch (error) {
+    await mkdir(job.out, { recursive: true });
+    await page.screenshot({ path: join(job.out, 'erreur.png') }).catch(() => {});
+    throw error;
+  }
+}
+
+// A click or a tap returns where its target was on screen, for the cursor or the finger the scene draws.
+async function gesture(action) {
   if (action.do === 'zoom') return zoom(action);
+  if (action.do === 'scroll') return scroll(action);
   const target = page.locator(action.selector).first();
+  const box = await target.boundingBox();
   if (action.do === 'tap') await target.tap();
   else await target.click();
-  return null;
+  return box ? { rect: [box.x, box.y, box.width, box.height].map((value) => Math.round(value * 100) / 100) } : null;
 }
 
 // What the camera needs, read in the page: each tracked element (box, opacity, group, flags), the stage, the texts.
