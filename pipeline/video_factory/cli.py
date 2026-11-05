@@ -99,6 +99,9 @@ def parser() -> argparse.ArgumentParser:
     shot.add_argument("--sortie", type=Path, help="le dossier du plan tourné (défaut : VF_MEDIA/vitrine/<nom du plan>)")
     shot.add_argument("--travail", type=Path, help="où construire la démo (défaut : VF_MEDIA/vitrine/travail)")
     shot.add_argument("--sans-rendu", action="store_true", help="écrire et vérifier la scène sans la rendre")
+    shot.add_argument(
+        "--scene-seule", action="store_true", help="garder la capture faite (track.json), ne refaire que la scène"
+    )
     return top
 
 
@@ -158,11 +161,17 @@ def run_capture(args: argparse.Namespace, home: Path) -> int:
     try:
         built = capture_demo.build(source, toolbox, work)
         print(f"démo : {built}")
-        found = capture_shoot.shoot(doc, source, toolbox, built, out)
-        print(f"capture : {len(found['frames'])} images, empreinte {found['all']}")
-        if "camera" in doc:
+        if args.scene_seule and (out / "track.json").is_file():
+            print("capture : gardée, seule la scène est refaite")
+        else:
+            found = capture_shoot.shoot(doc, source, toolbox, built, out)
+            print(f"capture : {len(found['frames'])} images, empreinte {found['all']}")
+        if "camera" in doc or "phone" in doc:
             track = json.loads((out / "track.json").read_text(encoding="utf-8"))
-            measures = capture_scene.make(out, track, doc["camera"], toolbox, render=not args.sans_rendu)
+            if "camera" in doc:
+                measures = capture_scene.make(out, track, doc["camera"], toolbox, render=not args.sans_rendu)
+            else:
+                measures = capture_scene.make_phone(out, track, doc["phone"], toolbox, built, not args.sans_rendu)
             print(json.dumps(measures, indent=2, ensure_ascii=False))
     except (
         capture_demo.DemoError,

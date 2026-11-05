@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      The « phone » scene of video-factory, written by vf capture: a capture of a real app on the iPhone (390x844 CSS
+      pixels, filmed at x3: assets/capture/capture.mp4), shown as the screen of a generic phone in 3D in a 1440x2560
+      frame. The phone's poses (KEYS: t, scale in frame pixels per CSS pixel, rx, ry, rz in degrees, y in frame pixels)
+      are eased one to the next (cubic, no overshoot); it holds before the first and after the last.
+
+      A finger shows each tap the plan draws (TAPS: when, and where in the screen's CSS pixels): it comes in, presses,
+      lifts and leaves. A notification can drop at the top of the screen; the first tap after it lands on it, and it
+      goes back up.
+
+      vf fills DURATION, LAYERS (the phone's edge, a stack of slices), CONFIG. Nothing is fetched: GSAP, the font and the
+      app's icon are local.
+    -->
+    <script src="assets/lib/gsap/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Mona Sans";
+        font-weight: 200 900;
+        font-style: normal;
+        src: url("assets/fonts/MonaSans-wght-latin.woff2") format("woff2");
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #010409;
+      }
+      #root {
+        position: relative;
+        width: 1440px;
+        height: 2560px;
+        overflow: hidden;
+        background: radial-gradient(60% 42% at 50% 46%, #0d2142 0%, #0a1222 45%, #010409 100%);
+        perspective: 7000px;
+        perspective-origin: 50% 46%;
+      }
+      /* The phone, in capture pixels (x3): screen 1170x2532, bezel 42. */
+      #phone {
+        position: absolute;
+        left: 720px;
+        top: 1280px;
+        width: 1254px;
+        height: 2616px;
+        margin: -1308px 0 0 -627px;
+        transform-style: preserve-3d;
+      }
+      .slice,
+      .body {
+        position: absolute;
+        inset: 0;
+        border-radius: 168px;
+      }
+      .slice {
+        background: #2a313c;
+      }
+      .body {
+        background: linear-gradient(150deg, #3a424e 0%, #1c2128 38%, #11151a 100%);
+        box-shadow: inset 0 0 0 4px #4b5563, inset 0 0 0 10px #161b22;
+      }
+      #screen {
+        position: absolute;
+        left: 42px;
+        top: 42px;
+        width: 1170px;
+        height: 2532px;
+        border-radius: 126px;
+        overflow: hidden;
+        background: #010409;
+      }
+      #screen video {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1170px;
+        height: 2532px;
+      }
+      .glare {
+        position: absolute;
+        inset: 0;
+        border-radius: 126px;
+        background: linear-gradient(125deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 32%);
+        pointer-events: none;
+      }
+      .punch {
+        position: absolute;
+        left: 555px;
+        top: 33px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #000;
+      }
+      /* The notification, in capture pixels. */
+      #note {
+        position: absolute;
+        left: 30px;
+        top: 120px;
+        width: 1110px;
+        box-sizing: border-box;
+        display: flex;
+        gap: 36px;
+        align-items: flex-start;
+        padding: 36px 42px 40px;
+        border-radius: 66px;
+        background: rgba(33, 38, 45, 0.97);
+        border: 3px solid #3d444d;
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+        font-family: "Mona Sans", sans-serif;
+        color: #f0f6fc;
+        opacity: 0;
+      }
+      #note img,
+      #note .icon {
+        flex: none;
+        width: 120px;
+        height: 120px;
+        border-radius: 28px;
+      }
+      #note .icon {
+        background: #1f6feb;
+      }
+      #note .head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 39px;
+        color: #9198a1;
+        font-weight: 500;
+      }
+      #note .title {
+        margin-top: 6px;
+        font-size: 48px;
+        font-weight: 650;
+        line-height: 1.15;
+      }
+      #note .text {
+        margin-top: 6px;
+        font-size: 44px;
+        line-height: 1.25;
+        color: #d1d7e0;
+      }
+      #finger {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 150px;
+        height: 150px;
+        margin: -75px 0 0 -75px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.42);
+        border: 6px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+        opacity: 0;
+      }
+      #ring {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 150px;
+        height: 150px;
+        margin: -75px 0 0 -75px;
+        border-radius: 50%;
+        border: 6px solid rgba(255, 255, 255, 0.8);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="{{DURATION}}"
+      data-fps="30"
+      data-width="1440"
+      data-height="2560"
+    >
+      <div id="phone" data-layout-allow-overflow>
+{{LAYERS}}
+        <div class="body"></div>
+        <div id="screen">
+          <video id="capture" class="clip" src="assets/capture/capture.mp4" data-start="0" data-duration="{{DURATION}}" data-track-index="0" muted playsinline></video>
+          <div id="note">{{NOTE}}</div>
+          <div id="ring"></div>
+          <div id="finger"></div>
+          <div class="glare"></div>
+        </div>
+        <div class="punch"></div>
+      </div>
+    </div>
+    <script id="phone-config" type="application/json">{{CONFIG}}</script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        var config = JSON.parse(document.getElementById("phone-config").textContent);
+        var X = 3; // capture pixels per CSS pixel of the screen
+        var tl = gsap.timeline({ paused: true });
+        var pose = function (key) {
+          return {
+            y: key.y,
+            rotationX: key.rx,
+            rotationY: key.ry,
+            rotationZ: key.rz,
+            scale: key.scale / X,
+          };
+        };
+        tl.set("#phone", pose(config.keys[0]), 0);
+        for (var i = 1; i < config.keys.length; i++) {
+          var from = config.keys[i - 1];
+          var to = pose(config.keys[i]);
+          to.duration = Math.max(1 / 30, config.keys[i].t - from.t);
+          to.ease = "power2.inOut";
+          tl.to("#phone", to, from.t);
+        }
+        // The edge: slices behind the body, each a little further back.
+        var slices = document.querySelectorAll(".slice");
+        for (var s = 0; s < slices.length; s++) {
+          gsap.set(slices[s], { z: -(s + 1) * 6 });
+        }
+        var note = config.notification;
+        var taps = config.taps.slice();
+        if (note) {
+          var shown = gsap.utils.toArray("#note");
+          tl.fromTo(shown, { opacity: 0, y: -260 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, note.at);
+          var leave = note.at + 4;
+          for (var t = 0; t < taps.length; t++) {
+            if (taps[t].at >= note.at) {
+              taps[t] = { at: taps[t].at, x: 195, y: note.centre };
+              leave = taps[t].at + 0.12;
+              break;
+            }
+          }
+          tl.to(shown, { opacity: 0, y: -260, duration: 0.3, ease: "power2.in" }, leave);
+        }
+        // The finger: comes in for 0.4 s, presses, lifts, leaves.
+        taps.forEach(function (tap) {
+          var x = tap.x * X;
+          var y = tap.y * X;
+          var start = Math.max(0, tap.at - 0.5);
+          tl.set("#finger", { x: x + 160, y: y + 260, scale: 1, opacity: 0 }, start);
+          tl.to("#finger", { x: x, y: y, opacity: 1, duration: 0.4, ease: "power3.out" }, start);
+          tl.to("#finger", { scale: 0.8, duration: 0.08, ease: "power2.out" }, tap.at);
+          tl.fromTo("#ring", { x: x, y: y, scale: 0.8, opacity: 0.9 }, { scale: 2.1, opacity: 0, duration: 0.4, ease: "power2.out" }, tap.at);
+          tl.to("#finger", { scale: 1, duration: 0.12, ease: "power2.out" }, tap.at + 0.1);
+          tl.to("#finger", { x: x + 120, y: y + 220, opacity: 0, duration: 0.3, ease: "power2.in" }, tap.at + 0.3);
+        });
+        tl.set({}, {}, config.duration);
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>

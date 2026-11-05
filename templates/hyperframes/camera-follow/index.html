@@ -48,6 +48,14 @@
         left: 0;
         top: 0;
       }
+      .cursor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+        opacity: 0;
+        filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
+      }
       .label {
         position: absolute;
         left: 0;
@@ -82,6 +90,9 @@
     >
 {{LAYERS}}
 {{LABELS}}
+      <svg id="cursor" class="cursor" viewBox="0 0 24 34" aria-hidden="true">
+        <path d="M2 2 L2 27 L8.2 21.4 L12.4 31.2 L16.6 29.4 L12.5 19.9 L20.8 19.9 Z" fill="#ffffff" stroke="#0d1117" stroke-width="1.6" stroke-linejoin="round" />
+      </svg>
     </div>
     <script id="camera-config" type="application/json">{{CONFIG}}</script>
     <script>
@@ -138,6 +149,20 @@
           if (label.end < config.duration) {
             tl.to(pill, { opacity: 0, filter: "blur(8px)", duration: 0.15, ease: "power2.in" }, label.end - 0.15);
           }
+        });
+        // The cursor: one state per frame ([x, y, opacity, press] in frame pixels), set at that frame, its tip on (x, y).
+        var cursor = document.getElementById("cursor");
+        var height = config.cursor_height;
+        cursor.setAttribute("width", String((height * 24) / 34));
+        cursor.setAttribute("height", String(height));
+        var last = null;
+        config.cursor.forEach(function (state, f) {
+          var key = JSON.stringify(state);
+          if (key === last) return;
+          last = key;
+          var at = Math.max(0, (f - 0.5) / FPS);
+          if (!state) tl.set(cursor, { opacity: 0 }, at);
+          else tl.set(cursor, { x: state[0] - 2 * (height / 34), y: state[1] - 2 * (height / 34), opacity: state[2], scale: state[3] }, at);
         });
         window.__timelines["main"] = tl;
       })();

@@ -11,6 +11,7 @@ of the final frames left empty (a run of rows of one flat colour) outside the su
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import time
 from collections.abc import Mapping, Sequence
@@ -31,6 +32,7 @@ BAND = {"top": compose.CAPTION["top"], "height": compose.CAPTION["height"]}
 EMPTY_TOLERANCE = 6  # grey levels: a row whose pixels all lie within this of each other is empty
 MIN_TEXT = 26  # pixels: the smallest text of the app allowed in the final image during a hold
 MAX_EMPTY_SHARE = 0.10  # of the frame's height: the tallest empty band allowed outside the subtitle band
+MIN_CAMERA_SCALE = 1.6  # below this, a wide shot
 
 
 class SceneError(Exception):
@@ -82,6 +84,48 @@ def escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+CURSOR_LEAD = 0.9  # seconds before a click the cursor appears
+CURSOR_TRAVEL = 0.6  # seconds it takes to reach its target
+CURSOR_FROM = (200.0, 260.0)  # where it comes from, in frame pixels from its target
+CURSOR_HEIGHT = 154  # pixels: 6 % of the frame's height
+
+
+def clicks(track: Mapping[str, object]) -> list[dict]:
+    """The clicks and taps the scene draws: those of the filmed range with a target, cursor left on."""
+    scenario = track.get("scenario", {"start": 0, "end": 0})
+    found = []
+    for action in track.get("actions", []):
+        if action.get("do") not in ("click", "tap") or action.get("cursor", True) is False:
+            continue
+        rect = (action.get("result") or {}).get("rect")
+        if not rect or not scenario["start"] <= float(action["ran_at"]) < scenario["end"]:
+            continue
+        found.append({"at": float(action["ran_at"]) - float(scenario["start"]), "point": camera.centre(rect)})
+    return found
+
+
+def cursor_states(track: Mapping[str, object], path: camera.Path) -> list[list[float] | None]:
+    """The cursor at each frame of the scene, [x, y, opacity, press scale] in frame pixels, or None: it comes in
+    from below right, eased, reaches the click's target, presses, holds, then fades; it rides the camera."""
+    fps = int(track["fps"])
+    states: list[list[float] | None] = [None] * len(path.poses)
+    lead, travel = round(CURSOR_LEAD * fps), round(CURSOR_TRAVEL * fps)
+    for click in clicks(track):
+        frame = math.ceil(click["at"] * fps - 1e-6)
+        for index in range(max(0, frame - lead), min(len(states), frame + 17)):
+            scale, x, y = path.poses[index]
+            tx, ty = x + scale * click["point"][0], y + scale * click["point"][1]
+            moved = camera.ease(min(1.0, max(0.0, (index - (frame - lead) - 3) / travel)))
+            done = 1 - (1 - moved) ** 2
+            px, py = tx + CURSOR_FROM[0] * (1 - done), ty + CURSOR_FROM[1] * (1 - done)
+            opacity = min(1.0, (index - (frame - lead) + 1) / 5)
+            if index > frame + 10:
+                opacity = max(0.0, 1 - (index - frame - 10) / 6)
+            press = 0.86 if frame <= index < frame + 3 else 1.0
+            states[index] = [round(px, 2), round(py, 2), round(opacity, 3), press]
+    return states
+
+
 def clip_scale(track: Mapping[str, object], camera_doc: Mapping[str, object]) -> float:
     """Pixels of the scene's clip per CSS pixel: the camera's scale, so a hold shows the clip pixel for pixel (the x3
     capture is resampled once, with Lanczos), never more than the capture has."""
@@ -102,6 +146,8 @@ def config(track: Mapping[str, object], camera_doc: Mapping[str, object], path: 
         "moving": [1 if moving else 0 for moving in path.moving()],
         "blur": camera_doc["blur"],
         "labels": [{"text": label["text"], "start": label["start"], "end": label["end"]} for label in found],
+        "cursor": cursor_states(track, path),
+        "cursor_height": CURSOR_HEIGHT,
         "band": BAND,
     }
 
@@ -162,6 +208,8 @@ def hold_text(track: Mapping[str, object], path: camera.Path) -> dict:
     sets = track["text_sets"]
     smallest, where = None, None
     for index in path.holds():
+        if path.poses[index][0] < MIN_CAMERA_SCALE - 1e-6:
+            continue  # a wide shot (« fit ») shows the whole stage, its texts are not read
         frame = track["frames"][index]
         size = camera.smallest_text(sets[frame["texts"]], path.centres[index], path.poses[index][0], stage)
         if size is not None and (smallest is None or size < smallest):
@@ -250,6 +298,111 @@ def make(
         measures["render_seconds"] = round(time.monotonic() - started, 1)
         frames = compose.rendered(rendered, len(path.poses))
         measures["empty"] = empty_band(toolbox.ffmpeg, frames) | {"maximum_share": MAX_EMPTY_SHARE}
+        encode_video(toolbox.ffmpeg, frames, out / f"{track['plan']}.mp4")
+    (out / "mesures.json").write_text(json.dumps(measures, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return measures
+
+
+PHONE_TEMPLATE = "phone"
+PHONE_SLICES = 6  # the phone's edge: slices behind its body, 6 capture pixels apart
+NOTE_CENTRE = 70  # CSS pixels of the screen: the middle of the notification, where its tap lands
+APP_ICON = "icons/icon-192.png"  # in the built demo: the app's own icon, on its notification
+
+
+def taps(track: Mapping[str, object]) -> list[dict]:
+    """The taps the phone scene draws, when (seconds of the plan) and where (CSS pixels of the screen)."""
+    return [
+        {"at": round(click["at"], 6), "x": round(click["point"][0], 2), "y": round(click["point"][1], 2)}
+        for click in clicks(track)
+    ]
+
+
+def note_html(note: Mapping[str, object] | None, icon: bool) -> str:
+    if not note:
+        return ""
+    picture = '<img src="assets/icon.png" alt="" />' if icon else '<div class="icon"></div>'
+    return (
+        f'{picture}<div><div class="head"><span>{escape(str(note["app"]))}</span><span>maintenant</span></div>'
+        f'<div class="title">{escape(str(note["title"]))}</div>'
+        f'<div class="text">{escape(str(note["text"]))}</div></div>'
+    )
+
+
+def write_phone(folder: Path, track: Mapping[str, object], phone: Mapping[str, object], icon: Path | None) -> dict:
+    """index.html of the phone scene, its font and the app's icon; the clip and GSAP are placed afterwards."""
+    frames = len(track["frames"])
+    note = phone.get("notification")
+    doc = {
+        "fps": int(track["fps"]),
+        "duration": frames / int(track["fps"]),
+        "keys": [dict(key) for key in phone["keys"]],
+        "taps": taps(track),
+        "notification": ({"at": note["at"], "centre": NOTE_CENTRE} if note else None),
+    }
+    duration = compose.seconds(frames)
+    values = {
+        "DURATION": duration,
+        "LAYERS": "\n".join('        <div class="slice"></div>' for _ in range(PHONE_SLICES)),
+        "NOTE": note_html(note, icon is not None),
+        "CONFIG": compose.script_json(doc),
+    }
+    (folder / "assets" / "capture").mkdir(parents=True)
+    (folder / "assets" / "fonts").mkdir(parents=True)
+    page = compose.fill((HYPERFRAMES_TEMPLATE / PHONE_TEMPLATE / "index.html").read_text("utf-8"), values)
+    (folder / "index.html").write_text(page, "utf-8")
+    for name in (FONT, FONT_LICENSE):
+        shutil.copyfile(HYPERFRAMES_TEMPLATE / TEMPLATE / "assets" / "fonts" / name, folder / "assets" / "fonts" / name)
+    if icon is not None:
+        shutil.copyfile(icon, folder / "assets" / "icon.png")
+    return doc
+
+
+def make_phone(
+    out: Path,
+    track: Mapping[str, object],
+    phone: Mapping[str, object],
+    toolbox: Toolbox,
+    demo: Path | None = None,
+    render: bool = True,
+) -> dict:
+    """The phone scene of an iPhone capture in out/scene/: written, checked, rendered to out/<plan>.mp4."""
+    if int(track["fps"]) != compose.FPS:
+        raise SceneError(f"la scène se rend à {compose.FPS} images par seconde, la capture en a {track['fps']}")
+    project, work, rendered = out / "scene", out / "scene-work", out / "scene-render"
+    for folder in (project, work, rendered):
+        if folder.exists():
+            shutil.rmtree(folder)
+    work.mkdir(parents=True)
+    rendered.mkdir(parents=True)
+    icon = demo / APP_ICON if demo is not None and (demo / APP_ICON).is_file() else None
+    doc = write_phone(project, track, phone, icon)
+    compose.ship_libraries(project, toolbox)
+    window, scale = track["window"], int(track["scale"])
+    size = (window["width"] * 3, window["height"] * 3)
+    if scale != 3:
+        raise SceneError("la scène téléphone se fait d'une capture en x3")
+    encode_capture(toolbox.ffmpeg, out / "frames", doc["fps"], size, project / "assets" / "capture" / "capture.mp4")
+    outside = compose.outside_references(project) + [f"absent : {name}" for name in compose.missing_files(project)]
+    if outside:
+        raise SceneError("la scène ne doit charger que ses propres fichiers :\n" + "\n".join(f"- {o}" for o in outside))
+    image = toolbox.image("hyperframes-render")
+    environment = dict(toolbox.entry("hyperframes")["env"])
+    report = compose.check_project(compose.check_command(image, environment, project, work))
+    (out / "check.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    smallest = min(float(key["scale"]) for key in phone["keys"])
+    measures: dict = {
+        "check": {
+            "ok": report.get("ok"),
+            "errors": compose.check_errors(report),
+            "warnings": compose.check_warnings(report),
+        },
+        "phone": {"smallest_scale": smallest, "taps": len(doc["taps"])},
+    }
+    if render:
+        started = time.monotonic()
+        media.run(compose.render_command(image, environment, project, rendered, work), "rendu de la scène")
+        measures["render_seconds"] = round(time.monotonic() - started, 1)
+        frames = compose.rendered(rendered, len(track["frames"]))
         encode_video(toolbox.ffmpeg, frames, out / f"{track['plan']}.mp4")
     (out / "mesures.json").write_text(json.dumps(measures, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return measures

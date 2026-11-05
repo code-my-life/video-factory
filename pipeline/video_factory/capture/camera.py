@@ -101,27 +101,37 @@ def ease(progress: float) -> float:
     return 1 - (-2 * progress + 2) ** 3 / 2
 
 
+Goal = tuple[float, float, float]  # the window's centre (CSS pixels) and the scale
+
+
 def smooth(
-    goals: Sequence[Point], fps: int, move: float, dead_zone: float
-) -> tuple[list[Point], list[tuple[int, int]]]:
-    """The camera's centre at each frame, and its moves: a new move starts when the goal leaves the dead zone around
-    the current aim, from where the camera is, and reaches the goal in `move` seconds."""
-    steps = max(1, round(move * fps))
+    goals: Sequence[Goal], fps: int, moves_s: Sequence[float], dead_zone: float, cuts: Sequence[int] | None = None
+) -> tuple[list[Goal], list[tuple[int, int]]]:
+    """The camera at each frame, and its moves: a new move starts when the goal leaves the dead zone around the current
+    aim, changes scale, or a cut starts, from where the camera is, and reaches the goal in that frame's move seconds.
+    The scale goes geometrically, so a zoom feels even."""
+    cut_at = set(cuts or [])
     position = aim_point = goals[0]
-    origin, started = position, None
-    centres: list[Point] = []
+    origin, started, steps = position, None, 1
+    found: list[Goal] = []
     moves: list[tuple[int, int]] = []
     for index, goal in enumerate(goals):
-        if math.dist(goal, aim_point) > dead_zone:
+        far = math.dist(goal[:2], aim_point[:2]) > dead_zone or abs(goal[2] - aim_point[2]) > 1e-6
+        if far or (index in cut_at and goal != aim_point):
+            steps = max(1, round(moves_s[index] * fps))
             origin, aim_point, started = position, goal, index
             moves.append((index, index + steps))
         if started is not None:
             done = ease((index - started) / steps)
-            position = (origin[0] + (aim_point[0] - origin[0]) * done, origin[1] + (aim_point[1] - origin[1]) * done)
+            position = (
+                origin[0] + (aim_point[0] - origin[0]) * done,
+                origin[1] + (aim_point[1] - origin[1]) * done,
+                origin[2] * (aim_point[2] / origin[2]) ** done,
+            )
             if index - started >= steps:
                 position, started = aim_point, None
-        centres.append(position)
-    return centres, merge(moves)
+        found.append(position)
+    return found, merge(moves)
 
 
 def merge(moves: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -143,24 +153,67 @@ def pose(centre_point: Point, scale: float) -> list[float]:
     ]
 
 
+def fit_scale(stage: Rect) -> float:
+    """The scale that shows the whole stage in the frame."""
+    return min(FRAME_W / stage[2], FRAME_H / stage[3])
+
+
+def settings(frames: Sequence[Mapping[str, object]], camera: Mapping[str, object]) -> list[tuple[int, dict]]:
+    """For each frame, the index of the cut in force (0: none yet) and the camera's settings there."""
+    base = {
+        "follow": camera["follow"],
+        "scale": camera["scale"],
+        "anchor": camera["anchor"],
+        "move": camera["move"],
+        "hold": False,
+    }
+    cuts = sorted(camera.get("cuts", []), key=lambda cut: cut["at"])
+    found = []
+    for frame in frames:
+        current, number = dict(base), 0
+        for index, cut in enumerate(cuts):
+            if float(frame["t"]) + 1e-9 >= float(cut["at"]):
+                current |= {key: cut[key] for key in ("follow", "scale", "anchor", "move") if key in cut}
+                current["hold"] = bool(cut.get("hold", False))
+                number = index + 1
+        found.append((number, current))
+    return found
+
+
 def path(track: Mapping[str, object], camera: Mapping[str, object]) -> Path:
-    """The camera path of a capture: its track (positions per frame and the stage) and the plan's camera."""
+    """The camera path of a capture: its track (positions per frame and the stage) and the plan's camera, with its
+    cuts (another element, another scale, the whole stage)."""
     frames = track["frames"]
     stage = (
         track["stage"]["rect"] if track.get("stage") else [0, 0, track["window"]["width"], track["window"]["height"]]
     )
-    points = targets(frames, str(camera["follow"]), camera.get("arriving"))
-    known = [point for point in points if point is not None]
-    if not known:
+    chosen = settings(frames, camera)
+    points: list[Point | None] = []
+    for frame, (_, current) in zip(frames, chosen, strict=True):
+        row = pick(frame["track"].get(str(current["follow"]), []), camera.get("arriving"))
+        points.append(centre(row["rect"]) if row else None)
+    if not any(point is not None for point in points):
         raise ValueError(f"« {camera['follow']} » n'est visible sur aucune image")
-    filled, last = [], known[0]
+    filled: list[Point] = []
+    last = next(point for point in points if point is not None)
     for point in points:
         last = point or last
         filled.append(last)
-    scale = float(camera["scale"])
-    goals = [aim(point, scale, camera["anchor"], stage) for point in filled]
-    centres, moves = smooth(goals, int(track["fps"]), float(camera["move"]), float(camera["dead_zone"]))
-    return Path([pose(point, scale) for point in centres], centres, moves)
+    goals: list[Goal] = []
+    for point, (_, current) in zip(filled, chosen, strict=True):
+        if current["hold"] and goals:
+            goals.append(goals[-1])
+            continue
+        if current["scale"] == "fit":
+            scale = fit_scale(stage)
+            point = (stage[0] + stage[2] / 2, stage[1] + stage[3] / 2)
+        else:
+            scale = float(current["scale"])
+        goals.append((*aim(point, scale, current["anchor"], stage), scale))
+    starts = [index for index in range(1, len(chosen)) if chosen[index][0] != chosen[index - 1][0]]
+    moves_s = [float(current["move"]) for _, current in chosen]
+    found, moves = smooth(goals, int(track["fps"]), moves_s, float(camera["dead_zone"]), starts)
+    return Path([pose(goal[:2], goal[2]) for goal in found], [goal[:2] for goal in found], moves)
 
 
 def window(centre_point: Point, scale: float) -> tuple[float, float, float, float]:
