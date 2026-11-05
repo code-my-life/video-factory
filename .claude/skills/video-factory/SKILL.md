@@ -137,8 +137,11 @@ The method, each point learned on the test shot:
   stopped (`result.to` in `track.json`).
 - **Change the camera's target with `camera.cuts`**: another element, scale or anchor at a scenario time, in one move.
   A `hold` freezes the camera while the page scrolls under it; a scale under 1.6 (or `fit`) is a wide shot, left out
-  of the 26 px rule. The graph's stage at the app's zoom 1 is only 1118 CSS px high, less than a scale-2 frame: shoot
-  close-ups at zoom 1.3 and pull back to about 1.4, not to the whole graph (bands of ground otherwise).
+  of the 26 px rule. Never move the camera while the page scrolls: the accumulated blur turns the two motions into
+  stepped ghosts; move first, then scroll in a still frame. The graph's stage at the app's zoom 1 is only 1118 CSS px high, less than a scale-2 frame: shoot
+  close-ups at zoom 1.3 and pull back to about 1.5, not to the whole graph (bands of ground otherwise). The app's
+  zoom grows from the left whatever point the wheel is on: scroll the graph sideways (`scroll` with `left`) to reach
+  the right column.
 - **Clicks and taps show**: the scene draws a big cursor (6 % of the frame's height) for a click, a finger for a tap,
   from the target rectangle the driver records; `"cursor": false` hides one (a second tap at the same instant).
 - **An iPhone plan gets a `phone` block**: the capture as the screen of a generic 3D phone, eased poses, a
