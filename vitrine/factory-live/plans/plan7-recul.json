@@ -15,7 +15,8 @@
     { "at": 76, "do": "click", "selector": "button[type=\"submit\"]:has-text(\"Débloquer\") >> visible=true" },
     { "at": 76.5, "do": "click", "selector": "a:has-text(\"Ligne d’usine\") >> visible=true" },
     { "at": 77, "do": "click", "selector": "[data-issue=\"claude-cockpit#73\"]" },
-    { "at": 77.5, "do": "zoom", "scale": 1.3, "x": 1400, "y": 1000, "measure": "[data-box=\"brief\"]" }
+    { "at": 77.5, "do": "zoom", "scale": 1.3, "x": 760, "y": 560, "measure": "[data-box=\"brief\"]" },
+    { "at": 77.5, "do": "scroll", "selector": "[data-box=\"review\"]", "left": 560, "duration": 0.5 }
   ],
   "stage": "section:has([data-box]) > div",
   "track": {
@@ -27,7 +28,7 @@
     "scale": 2,
     "move": 0.5,
     "anchor": { "x": 0.5, "y": 0.45 },
-    "cuts": [{ "at": 84.6, "scale": 1.4, "anchor": { "x": 0.5, "y": 0.5 }, "move": 1.0 }],
+    "cuts": [{ "at": 84.6, "scale": 1.5, "anchor": { "x": 0.5, "y": 0.5 }, "move": 1.0 }],
     "labels": { "ci": "La CI de main", "deploy": "Le déploiement", "done": "Terminé" }
   }
 }
