@@ -68,6 +68,7 @@ FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son i
 - [docs/decisions/0003-projet-hyperframes-gsap-et-registre.md](docs/decisions/0003-projet-hyperframes-gsap-et-registre.md) : le vrai projet HyperFrames de `compose`, GSAP livré, le registre et les skills.
 - [docs/decisions/0004-board-studio.md](docs/decisions/0004-board-studio.md) : le board Hermès « studio », ses stations, ses voies sans modèle et la page des prises.
 - [docs/decisions/0005-capture-pilotee-et-camera-qui-suit.md](docs/decisions/0005-capture-pilotee-et-camera-qui-suit.md) : `vf capture`, la variante de scénario de factory-live et la scène « caméra qui suit ».
+- [docs/decisions/0006-api-generique-du-workflow.md](docs/decisions/0006-api-generique-du-workflow.md) : la fiche du workflow et l'API générique que factory-live lit.
 - [.claude/skills/video-factory/SKILL.md](.claude/skills/video-factory/SKILL.md) : le skill des agents, du script annoté aux scènes.
 - [docs/map/AGENTS.md](docs/map/AGENTS.md) : la carte du dépôt (ICM, en anglais).
 
