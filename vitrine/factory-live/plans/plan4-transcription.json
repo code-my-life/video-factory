@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../schemas/capture-plan.schema.json",
+  "plan_version": 1,
+  "name": "plan4-transcription",
+  "about": "Vidéo 1, plans 4 et 5 : clic sur claude-cockpit#73 à la gate, la fiche de l'issue (agent, modèle), clic sur Transcription, la transcription de la gate défile en direct ; le bandeau du plan 5 se pose sur la fin.",
+  "app": "factory-live",
+  "device": "desktop",
+  "window": { "width": 1440, "height": 1600 },
+  "scale": 3,
+  "fps": 30,
+  "scenario": { "start": 64.5, "end": 76.5 },
+  "actions": [
+    { "at": 50, "do": "zoom", "scale": 1.3, "x": 760, "y": 560, "measure": "[data-box=\"brief\"]" },
+    { "at": 64.9, "do": "click", "selector": "[data-issue=\"claude-cockpit#73\"]" },
+    { "at": 65.5, "do": "scroll", "selector": "[class*=\"runTable\"]", "offset": 330, "duration": 0.9 },
+    { "at": 67.0, "do": "click", "selector": "nav[aria-label=\"Détails de l’issue\"] >> text=Transcription" }
+  ],
+  "track": {
+    "issue": { "selector": "[data-issue=\"claude-cockpit#73\"]", "group": "data-box", "flags": ["data-arriving"] },
+    "runs": { "selector": "[class*=\"runTable\"]" },
+    "entry": { "selector": "li[data-role]" }
+  },
+  "camera": {
+    "follow": "issue",
+    "scale": 2,
+    "move": 0.5,
+    "anchor": { "x": 0.5, "y": 0.5 },
+    "cuts": [
+      { "at": 65.4, "hold": true },
+      { "at": 66.45, "follow": "runs", "anchor": { "x": 0.85, "y": 0.3 }, "move": 0.6 }
+    ]
+  }
+}
