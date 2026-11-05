@@ -12,7 +12,7 @@ hits:
 
 # camera follow scene
 
-`templates/hyperframes/camera-follow/`: the HyperFrames scene `vf capture` writes for a plan with a camera (#19). `index.html` is its one root (1440x2560, 30 fps): the capture clip in `COPIES` camera layers, each moved by one linear tween per frame along the path vf computed, clipped to the stage over the stage's own ground; the trailing copies (the motion blur by accumulation) show only during the moves; the plan's titles in the subtitle band; the cursor of each click, one state per frame computed by vf on the camera's pose (#22). `assets/fonts/` holds Mona Sans (latin subset of the variable font, OFL) and its licence.
+`templates/hyperframes/camera-follow/`: the HyperFrames scene `vf capture` writes for a plan with a camera (#19). `index.html` is its one root (1440x2560, 30 fps): the capture clip in `COPIES` camera layers, each moved by one linear tween per frame along the path vf computed, clipped to the stage over the stage's own ground; the trailing copies (the motion blur by accumulation) show only during the moves; the plan's titles at the top of the safe zone, clear of the captions; the cursor of each click, one state per frame computed by vf on the camera's pose (#22). `assets/fonts/` holds Mona Sans (latin subset of the variable font, OFL) and its licence.
 
 ## Why this shape
 

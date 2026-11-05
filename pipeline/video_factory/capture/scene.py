@@ -2,7 +2,8 @@
 `hyperframes check` and rendered in the pinned render image without the network, then measured.
 
 The capture's frames become one lossless-looking clip (x264, as compose encodes its tracks); the camera path comes from
-`camera`; the titles of the plan show while the followed element stands in their group, in the subtitle band. The
+`camera`; the titles of the plan show while the followed element stands in their group, at the top of the safe zone
+(the subtitle band is the captions'). The
 measures are the rules of the showcase videos, read on what was made, not assumed: how long each move lasts, the
 smallest text of the app in the final image during the holds (from the sizes the driver read), and the tallest band
 of the final frames left empty (a run of rows of one flat colour) outside the subtitle band.
@@ -29,6 +30,8 @@ FONT = "MonaSans-wght-latin.woff2"
 FONT_LICENSE = "MonaSans-OFL.txt"
 # The subtitle band of the showcase videos: compose's caption band (pixels of the 1440x2560 frame).
 BAND = {"top": compose.CAPTION["top"], "height": compose.CAPTION["height"]}
+# Where the plan's titles sit: just under the top of the safe zone, clear of the captions.
+TITLE_TOP = round(compose.SAFE["top"] * compose.HEIGHT) + 40
 EMPTY_TOLERANCE = 6  # grey levels: a row whose pixels all lie within this of each other is empty
 MIN_TEXT = 26  # pixels: the smallest text of the app allowed in the final image during a hold
 MAX_EMPTY_SHARE = 0.10  # of the frame's height: the tallest empty band allowed outside the subtitle band
@@ -149,6 +152,7 @@ def config(track: Mapping[str, object], camera_doc: Mapping[str, object], path: 
         "cursor": cursor_states(track, path),
         "cursor_height": CURSOR_HEIGHT,
         "band": BAND,
+        "title_top": TITLE_TOP,
     }
 
 
