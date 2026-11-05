@@ -3,7 +3,7 @@
   "lock_version": 1,
   "platform": "linux-x86_64",
   "not_pinned_yet": [
-    "Les polices du design system vidéo : elles arrivent avec son issue. Le gabarit provisoire de compose embarque une seule police, Inter Bold (OFL), figée dans le dépôt (templates/hyperframes/assets/fonts/).",
+    "Les polices du design system vidéo : elles arrivent avec son issue. Le gabarit provisoire de compose embarque une seule police, Inter Bold (OFL), figée dans le dépôt (templates/hyperframes/assets/fonts/) ; la scène de vf capture embarque Mona Sans (OFL), la police de factory-live (templates/hyperframes/camera-follow/assets/fonts/).",
     "Les paquets Python (LiteRT, numpy, jsonschema) ne sont pas ici : uv.lock les fige, par version et empreinte."
   ],
   "tools": [
@@ -112,6 +112,48 @@
       "version_check": { "command": ["node_modules/.bin/hyperframes", "--version"], "expect": "0.9.12" },
       "post_install": [["node_modules/.bin/hyperframes", "telemetry", "disable"]],
       "config_expect": { "path": "~/.hyperframes/config.json", "values": { "telemetryEnabled": false } }
+    },
+    {
+      "name": "node-24",
+      "kind": "archive",
+      "version": "v24.22.1",
+      "about": "Node.js 24, celui que factory-live demande (.node-version, engine-strict) : vf capture construit sa démo avec lui.",
+      "source": "nodejs.org, v24.22.1, linux-x64",
+      "url": "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz",
+      "sha256": "6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6",
+      "install": "uv run vf doctor --install node-24",
+      "strip_components": 1,
+      "tree_sha256": "582324ba3f4c3409bac8b8cfbf12e3b058705084e25618bf97b3bb75e3faf70b",
+      "version_check": { "command": ["bin/node", "--version"], "expect": "v24.22.1" }
+    },
+    {
+      "name": "playwright",
+      "kind": "npm",
+      "version": "1.64.1",
+      "about": "Playwright (playwright-core, Apache 2.0) : vf capture pilote la démo de factory-live avec lui, à horloge simulée. La version des e2e de factory-live ; il ne télécharge aucun navigateur.",
+      "source": "npm, playwright-core@1.64.1, figé par toolchain/playwright/package-lock.json",
+      "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz",
+      "sha256": "3af03703c967c95037454f2283f709d53ce804a4776d4219d319f5bbcc2a0185",
+      "install": "uv run vf doctor --install playwright",
+      "requires": ["node"],
+      "package": "playwright-core",
+      "lockfile": "toolchain/playwright/package-lock.json",
+      "tree_sha256": "1aee7fc2f91a8d7745fa075bd6896df3bfcde2c00ccdcbbc3249f220382b5fa9",
+      "env": { "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1" },
+      "version_check": { "command": ["node_modules/.bin/playwright-core", "--version"], "expect": "Version 1.64.1" }
+    },
+    {
+      "name": "chromium-headless-shell",
+      "kind": "archive",
+      "version": "156.0.8078.4",
+      "about": "Chrome Headless Shell 156.0.8078.4 (Chrome for Testing), le navigateur de Playwright 1.64.1 (sa révision 1248) : vf capture le lance par son chemin.",
+      "source": "cdn.playwright.dev, builds/cft/156.0.8078.4/linux64, la même archive que « playwright install chromium-headless-shell »",
+      "url": "https://cdn.playwright.dev/builds/cft/156.0.8078.4/linux64/chrome-headless-shell-linux64.zip",
+      "sha256": "c3e50596aef52c58f8fda3c6b3411c33d34c88b177b3ed1c2243359fd3b8ba20",
+      "install": "uv run vf doctor --install chromium-headless-shell",
+      "strip_components": 1,
+      "tree_sha256": "a04f46b75984a7a9820304df2ff6872ed0db72d3a97cd7a85e96cfd5477c8192",
+      "version_check": { "command": ["chrome-headless-shell", "--version"], "expect": "Google Chrome for Testing 156.0.8078.4" }
     },
     {
       "name": "hyperframes-render-base",

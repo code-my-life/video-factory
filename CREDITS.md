@@ -12,6 +12,14 @@ La police du gabarit provisoire de `compose` :
   - Source : https://github.com/rsms/inter, version 4.1
   - Licence : `templates/hyperframes/assets/fonts/OFL.txt`
 
+La police de la scène « caméra qui suit » de `vf capture` (celle de factory-live) :
+
+- Mona Sans, de The Mona Sans Project Authors (GitHub), SIL Open Font License 1.1, non modifiée : le sous-ensemble latin de la police variable, tel que le paquet `@fontsource-variable/mona-sans` 5.3.0 le livre
+  - Source : https://github.com/github/mona-sans
+  - Licence : `templates/hyperframes/camera-follow/assets/fonts/MonaSans-OFL.txt`
+
+La variante de scénario de factory-live (`vitrine/factory-live/scenario.patch`) modifie le code de factory-live, de Code My Life, sous licence MIT, comme ce dépôt.
+
 Les blocs et composants du registre HyperFrames, restylés pour le gabarit provisoire de `compose` :
 
 - `mk-specs-list`, `mk-progress-stat` (blocs) et `caption-highlight` (composant), de HeyGen, Inc. (HyperFrames), Apache 2.0, modifiés
@@ -26,3 +34,9 @@ Les bibliothèques que `compose` copie dans un projet (jamais dans ce dépôt : 
 
 - GSAP 3.15.0 (la copie qu'embarque HyperFrames 0.9.12), GreenSock, licence standard sans frais : https://gsap.com/standard-license
 - lottie-web 5.13.0, @lottiefiles/dotlottie-web 0.81.0, anime.js 4.5.0, Three.js 0.186.1 : MIT, leur licence copiée avec elles
+
+Les outils de `vf capture` (jamais dans ce dépôt : installés sous `VF_TOOLS` par `vf doctor --install`) :
+
+- Playwright 1.64.1 (`playwright-core`), Microsoft, Apache 2.0
+- Chrome Headless Shell 156.0.8078.4 (Chrome for Testing), The Chromium Authors, BSD et licences de ses composants (`LICENSE.headless_shell` dans son archive)
+- Node.js 24.22.1, MIT

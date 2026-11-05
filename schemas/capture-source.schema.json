@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/code-my-life/video-factory/main/schemas/capture-source.schema.json",
+  "title": "Source figée d'une app filmée, version 1",
+  "description": "vitrine/<app>/source.json : le dépôt et le commit de l'app, sa variante de scénario, et comment construire sa démo. vf capture la construit dans un dossier de travail, jamais dans le dépôt de l'app.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_version", "app", "repository", "commit", "patch", "node", "install", "build", "build_env", "out_dir_env", "ready"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "source_version": { "const": 1 },
+    "app": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "about": { "type": "string", "minLength": 1 },
+    "repository": { "description": "Le dépôt git de l'app (adresse https).", "type": "string", "pattern": "^https://[^\\s]+$" },
+    "commit": { "description": "Le commit figé, en entier.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "patch": { "description": "La variante de scénario, un fichier de ce dossier appliqué par git apply.", "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.patch$" },
+    "node": { "description": "L'entrée du lock (une archive Node.js) qui installe et construit la démo.", "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "install": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "build": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "build_env": { "type": "object", "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" }, "additionalProperties": { "type": "string" } },
+    "out_dir_env": { "description": "La variable qui dit au build où écrire la démo.", "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "storage": { "description": "Ce que la page trouve dans son localStorage au départ (la langue, par exemple).", "type": "object", "additionalProperties": { "type": "string" } },
+    "ready": { "description": "Le sélecteur d'un élément présent quand l'app est prête.", "type": "string", "minLength": 1 },
+    "font": { "description": "La police à charger avant la première image (syntaxe de document.fonts.load).", "type": "string", "minLength": 1 }
+  }
+}

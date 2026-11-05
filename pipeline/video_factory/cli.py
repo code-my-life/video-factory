@@ -1,16 +1,21 @@
-"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf status`, `vf run`, `vf publish` and `vf studio`. Its
-messages are in French, like its docs."""
+"""The `vf` command: `vf doctor`, `vf new`, `vf ingest`, `vf status`, `vf run`, `vf publish`, `vf studio` and
+`vf capture`. Its messages are in French, like its docs."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 
-from video_factory import __version__, chain, doctor, install, lock, media, paths, publish, state, videos
+from video_factory import __version__, chain, compose, doctor, install, lock, media, paths, publish, state, videos
+from video_factory.capture import demo as capture_demo
+from video_factory.capture import plan as capture_plan
+from video_factory.capture import scene as capture_scene
+from video_factory.capture import shoot as capture_shoot
 from video_factory.context import StepError, Video
 from video_factory.studio import board as studio_board
 from video_factory.studio import service
@@ -82,6 +87,18 @@ def parser() -> argparse.ArgumentParser:
     card = actions.add_parser("carte", help="ouvrir la carte d'une vidéo (nouvelle idée, ou vidéo qui existe)")
     card.add_argument("id", help="identifiant de la vidéo")
     card.add_argument("idee", nargs="?", default="", help="l'idée en une phrase")
+    shot = commands.add_parser(
+        "capture",
+        help="tourner un plan d'app : la démo pilotée à horloge simulée, image par image, et sa caméra qui suit",
+        description="Construit la démo de l'app du plan (vitrine/<app>/, au commit figé, avec sa variante de "
+        "scénario), la pilote avec Playwright à horloge simulée selon le plan, écrit les images, la position des "
+        "éléments suivis et leurs empreintes ; si le plan a une caméra, écrit la scène HyperFrames « caméra qui "
+        "suit », la vérifie, la rend sans réseau et la mesure.",
+    )
+    shot.add_argument("plan", type=Path, help="le plan de capture (JSON, schemas/capture-plan.schema.json)")
+    shot.add_argument("--sortie", type=Path, help="le dossier du plan tourné (défaut : VF_MEDIA/vitrine/<nom du plan>)")
+    shot.add_argument("--travail", type=Path, help="où construire la démo (défaut : VF_MEDIA/vitrine/travail)")
+    shot.add_argument("--sans-rendu", action="store_true", help="écrire et vérifier la scène sans la rendre")
     return top
 
 
@@ -123,6 +140,42 @@ def run_studio(args: argparse.Namespace, home: Path) -> int:
         print(f"vf studio : {exc}", file=sys.stderr)
         return 1
     print(f"carte {card} : {args.id}")
+    return 0
+
+
+def run_capture(args: argparse.Namespace, home: Path) -> int:
+    places = paths.places(os.environ, home)
+    try:
+        pinned = lock.load(paths.LOCK_FILE)
+        doc = capture_plan.load(args.plan)
+        source = capture_plan.load_source(doc["app"])
+    except (lock.LockError, capture_plan.PlanError) as exc:
+        print(f"vf capture : {exc}", file=sys.stderr)
+        return 1
+    toolbox = Toolbox(pinned, places.tools)
+    out = args.sortie or places.media / "vitrine" / doc["name"]
+    work = args.travail or places.media / "vitrine" / "travail"
+    try:
+        built = capture_demo.build(source, toolbox, work)
+        print(f"démo : {built}")
+        found = capture_shoot.shoot(doc, source, toolbox, built, out)
+        print(f"capture : {len(found['frames'])} images, empreinte {found['all']}")
+        if "camera" in doc:
+            track = json.loads((out / "track.json").read_text(encoding="utf-8"))
+            measures = capture_scene.make(out, track, doc["camera"], toolbox, render=not args.sans_rendu)
+            print(json.dumps(measures, indent=2, ensure_ascii=False))
+    except (
+        capture_demo.DemoError,
+        capture_shoot.ShootError,
+        capture_scene.SceneError,
+        compose.ComposeError,
+        ToolError,
+        media.MediaError,
+        ValueError,
+    ) as exc:
+        print(f"vf capture : {exc}", file=sys.stderr)
+        return 1
+    print(f"vf capture : {out}")
     return 0
 
 
@@ -237,6 +290,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_publish(args.id, home)
     if args.command == "studio":
         return run_studio(args, home)
+    if args.command == "capture":
+        return run_capture(args, home)
     try:
         if args.command == "ingest":
             return run_ingest(args, home)
