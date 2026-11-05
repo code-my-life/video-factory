@@ -1,6 +1,6 @@
 ---
 name: video-factory
-description: How video-factory turns an annotated script into the HyperFrames project of `compose` - which annotation becomes which scene, the strictest safe zones of TikTok, Reels and Shorts, the offline render, how each allowed animation library is shipped, and how to pull a block or component from the HyperFrames registry into templates/hyperframes/. Use when changing compose, a scene template, the captions, or adding a registry item or a library to this repository.
+description: How video-factory turns an annotated script into the HyperFrames project of `compose` - which annotation becomes which scene, the strictest safe zones of TikTok, Reels and Shorts, the offline render, how each allowed animation library is shipped, how to pull a block or component from the HyperFrames registry into templates/hyperframes/ - and how `vf capture` films a real app's demo on a fake clock with a camera that follows one element (plans, scenario variant, camera, motion blur, measures). Use when changing compose, a scene template, the captions, adding a registry item or a library, or shooting or changing a capture plan of a showcase video.
 ---
 
 # video-factory: from the script to the HyperFrames project
@@ -93,3 +93,50 @@ download), install it, and say in the docs what it is for.
    font): the final look comes with the video design system, so invent no brand.
 4. Wire it in `compose` (`SCENES` and the config of its kind), add a test, then run the tests, a sample project
    through `hyperframes check` in the image, and look at a few rendered frames of both passes.
+
+## Filming an app: `vf capture` and the camera that follows
+
+Showcase videos show the real app, never a mock-up (#19, ADR 0005). `uv run vf capture <plan.json>` builds the app's
+demo at its pinned commit with its scenario variant (`vitrine/<app>/source.json`, `scenario.patch`), drives it frame by
+frame and, when the plan has a camera, writes, checks, renders and measures the `templates/hyperframes/camera-follow/`
+scene. The plans live in `vitrine/<app>/plans/` (schema `schemas/capture-plan.schema.json`); the output goes to
+`VF_MEDIA/vitrine/<plan>/` (`frames/`, `track.json`, `empreintes.json`, `scene/`, `mesures.json`, `<plan>.mp4`).
+
+The method, each point learned on the test shot:
+
+- **The clock is installed and paused before the page loads**: the demo's scenario starts at that instant, and only
+  `clock.runFor` moves it. A plan's times are scenario seconds.
+- **`Element.prototype.animate` is removed** before the app runs: Motion then animates with `requestAnimationFrame`,
+  which the fake clock drives; with WAAPI it would run in real time. CSS animations and transitions run on the real
+  document timeline: each is paused as soon as it is seen and set from the fake clock from then on.
+- **The clock moves 1 ms at a time**, and the page's MessageChannel tasks (React's scheduler, which the fake clock does
+  not drive) are let through after every step. With 8 ms steps a React render landed on either side of an animation
+  frame depending on the machine's speed, and Motion's flow clock drifted by hundredths of a pixel: two captures
+  differed. One millisecond costs about 2.6 ms of real time per step.
+- **Zoom with the app's own zoom** (a `zoom` action: Ctrl and the wheel around a point), never a CSS transform of the
+  page. Chrome divides a synthetic wheel delta by the device scale factor; the driver multiplies it back.
+- **The desktop window is tall** (1440x1600): at camera scale 2, the frame shows 720x1280 CSS px, and the graph's
+  stage (the viewport under the filter bar) must be at least that tall or the frame shows bands of ground.
+- **The camera stays inside the stage** (`stage`, a CSS selector) and the scene shows only the stage, on its own
+  ground: no header, sidebar or filter bar, whose small text would break the 26 px rule.
+- **Scale 1.6 to 2**, text at least 26 px in the final image during the holds: the app's zoom (1.3 for the graph) makes
+  its smallest text about 14.8 CSS px, so 29.6 px at scale 2 (measured). `mesures.json` gives the smallest text shown.
+- **Fill the frame, keep the subtitle band clear**: at 1.2 the graph left 11 % of the frame empty under it; at 1.3,
+  with the anchor at mid-height, the tallest empty band is under 10 % and the followed row stays above the subtitle
+  band (y 1424). Check both on `mesures.json` and on a few rendered frames before keeping a plan.
+- **Moves of 0.4 to 0.6 s, no overshoot**: a move is a cubic ease of fixed length from where the camera is to where
+  it should be; a dead zone ignores small drifts. The camera leaves with the element as soon as its arriving copy
+  appears in the next box (`camera.arriving`, the `data-arriving` flag).
+- **The scene's clip is made at the camera's scale** (2 px per CSS px, Lanczos from the x3 frames): a hold shows it
+  pixel for pixel, and the render decodes 2.25 times fewer pixels than at x3.
+- **Motion blur by accumulation**: `data-motion-blur` of HyperFrames 0.9.12 skips a layer that moves over the whole
+  frame, so the scene stacks copies of the camera layer, each a fraction of a frame behind, at 1/(k+1). The trailing
+  copies are hidden during the holds, so the blur costs only during the moves (the RUNBOOK gives the measured cost).
+- **Same plan, same bytes is the goal**: compare the `empreintes.json` « all » of two captures. Two captures still
+  drift (on plan 3, a tenth of a CSS pixel on Motion animations from frame 76, a few hundred pixels
+  around spinners), so something still reads a real time: a rendering frame of Chrome or a ResizeObserver are the
+  suspects left (#19). Find it, never accept a drift as normal.
+
+A new app to film: add `vitrine/<app>/source.json` and its variant; a new version of factory-live: change the commit,
+redo the variant on it (its own tests must pass), and check that `git apply --check` accepts it
+(`tests/test_capture.py`).

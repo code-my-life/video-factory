@@ -43,6 +43,8 @@ Chaque outil vit dans `$VF_TOOLS/<outil>/<version>/` ; deux versions ne s'écras
 | `hyperframes` (npm) | La version et l'empreinte du paquet installé, le `package-lock.json` utilisé, `hyperframes --version`, et la télémétrie coupée dans `~/.hyperframes/config.json`. |
 | `hyperframes-render-base` (image Docker) | L'étiquette `node:22.23.4-bookworm-slim` pointe sur le digest figé. |
 | `hyperframes-render` (image construite) | Le dossier `toolchain/hyperframes/` a l'empreinte du lock, et l'image `vf-hyperframes-render:0.9.12-1` a le digest figé (son manifeste, ou sa configuration dans l'ancien magasin de Docker). |
+| `node-24`, `chromium-headless-shell` (archives) | Comme les autres archives ; Chrome Headless Shell se livre en zip : l'installation n'en extrait que des fichiers ordinaires, sans lien ni chemin qui sorte du dossier, chacun avec son droit d'exécution. |
+| `playwright` (npm) | Comme `hyperframes` : la version et l'empreinte de `playwright-core`, le `toolchain/playwright/package-lock.json` utilisé, `playwright-core --version`. Il ne télécharge aucun navigateur (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`) : `vf capture` lance `chromium-headless-shell` par son chemin. |
 | `gsap`, `lottie-web`, `dotlottie-web`, `animejs`, `three` (bibliothèques) | Chaque fichier copié, à son empreinte SHA-256, et rien d'autre dans le dossier. L'installation télécharge l'archive npm, vérifie son empreinte, puis n'en extrait que les fichiers nommés, chacun vérifié. GSAP est pris dans l'archive de HyperFrames 0.9.12 elle-même (`dist/vendor/npm/gsap@3.15.0/dist`) : la copie qu'il embarque. |
 
 whisper.cpp est construit pour le CPU avec des options fixes (`GGML_NATIVE=OFF`, AVX2, FMA, F16C, BMI2), le même binaire quel que soit le processeur de la machine qui construit. HyperFrames s'installe par `npm ci --ignore-scripts` depuis `toolchain/hyperframes/package-lock.json`, une fois vérifié que ce fichier fige l'archive dont l'empreinte vient d'être contrôlée.
@@ -146,6 +148,48 @@ uv run vf run ma-video --refaire compose master
 
 refait le rendu et le master même à jour. `state.json` garde l'empreinte des fichiers `master_framemd5` et `tiktok_framemd5` : deux rendus des mêmes entrées doivent donner la même. Après une montée de version de HyperFrames, faire ce rendu sur une vidéo publiée et comparer.
 
+## Tourner un plan d'app (`vf capture`)
+
+Les vidéos vitrine montrent la vraie app, jamais une maquette (#19, ADR 0005). Un plan se déclare en JSON (`schemas/capture-plan.schema.json`), sous `vitrine/<app>/plans/` :
+
+```bash
+uv run vf doctor --install node-24 playwright chromium-headless-shell
+uv run vf capture vitrine/factory-live/plans/plan3-graphe.json
+```
+
+`vf capture` :
+
+1. vérifie le plan (un plan refusé nomme chaque champ en cause) et la source de l'app (`vitrine/<app>/source.json`) ;
+2. construit la démo dans `VF_MEDIA/vitrine/travail/<app>/<clé>/` (ou `--travail`) : le seul commit figé (`git fetch --depth 1`), la variante de scénario appliquée par `git apply` (refusée si elle ne s'ajuste plus), l'installation et le build de l'app avec le Node.js du lock. La clé dépend du commit, de la variante, du Node.js et des commandes : un build déjà fait sert tel quel. Le dépôt de l'app n'est jamais touché ;
+3. pilote la démo avec Playwright et Chrome Headless Shell, horloge simulée, une milliseconde à la fois, et écrit dans `VF_MEDIA/vitrine/<plan>/` (ou `--sortie`) : `frames/f_000001.png`…, `track.json` (la boîte de chaque élément suivi à chaque image, la scène filmée, les gestes faits, la taille de chaque texte visible) et `empreintes.json` (l'empreinte de chaque image, de la trajectoire, et `all` sur le tout) ;
+4. si le plan a une caméra : écrit la scène `scene/` depuis `templates/hyperframes/camera-follow/`, la vérifie (`hyperframes check --json`, dans l'image figée, sans réseau), la rend de même, en fait `<plan>.mp4` et écrit `mesures.json` : la durée réelle de chaque mouvement, le plus petit texte de l'app dans l'image finale pendant les tenues (26 px au moins), la plus haute bande vide hors de la bande des sous-titres (10 % de la hauteur au plus), le temps du rendu. `--sans-rendu` s'arrête après la vérification.
+
+Refaire un plan : relancer la même commande ; la ligne « capture : … images, empreinte … » donne l'empreinte de tout le plan (`all` de `empreintes.json`), et la comparer à celle d'une capture précédente dit s'il est refait à l'identique. **Ce n'est pas encore toujours le cas** (#19, « Ce qui n'est pas prouvé ») : deux captures du plan 3 ont la même trajectoire jusqu'à l'image 76, puis des écarts d'un dixième de pixel CSS au plus, et des images qui diffèrent de quelques centaines de pixels sur 20 millions (23 niveaux au plus), autour des indicateurs qui tournent et des animations de Motion ; deux captures d'un plan court (24 images) diffèrent de même. Ce qui reste lit encore un temps réel (une image de rendu de Chrome, un observateur de taille) ; le chercher, ne pas l'accepter comme normal.
+
+Les plans de factory-live :
+
+| Plan | Ce qu'il montre |
+| --- | --- |
+| `plan3-graphe` | La vidéo 1, plan 3 : claude-cockpit#73 glisse du brief au code puis à la gate, sur le graphe zoomé (zoom de l'app à 1,3), la caméra la suit à l'échelle 2, l'issue à mi-hauteur, au-dessus de la bande des sous-titres. Fenêtre 1440x1600, x3, 55,5 à 64,5 s du scénario. |
+| `iphone-ligne` | L'iPhone : la ligne d'usine en 390x844, tactile, en x3, une seconde au départ de claude-cockpit#73 du brief. |
+| `parcours-une-issue` | Le relevé de la variante : la station de claude-cockpit#73, deux images par seconde, de 0 à 95 s (intake, brief, implémentation, gate, revue, fusion, CI de main, déploiement, Terminé). |
+
+La variante de factory-live (`vitrine/factory-live/scenario.patch`) se refait sur un nouveau commit dans une copie de travail de factory-live, jamais dans son dépôt : appliquer l'ancienne variante, corriger, vérifier (`npx tsc -b apps/web`, `npx vitest run`, `npx prettier --check`), puis `git diff > scenario.patch` et changer `commit` dans `source.json`.
+
+### Le coût
+
+Mesuré le 5 novembre 2026 sur le plan 3 (270 images, 9 s, fenêtre 1440x1600 en x3, machine de 16 fils, WSL 2) :
+
+| Étape | Temps |
+| --- | --- |
+| Construction de la démo (`npm ci` et build, cache npm chaud) | 13 s, une fois par clé |
+| Capture : 64,5 s de scénario pas à pas (1 ms), puis 270 images de 4320x4800 | 5 à 7 min (303 s, 365 s, 445 s sur trois captures) |
+| Rendu de la scène sans flou (1 copie) | 26 s |
+| Rendu avec le flou, 6 copies visibles à chaque image | 270 s, soit 10,5 fois le rendu sans flou |
+| Rendu avec le flou, 6 copies seulement pendant les mouvements (le réglage retenu) | 150 s et 232 s sur deux rendus, soit 6 à 9 fois le rendu sans flou |
+
+Le flou coûte parce que chaque copie est une couche de 2880x3200 à composer ; le cacher pendant les tenues (238 images sur 270) gagne de 15 à 45 % selon le rendu, et faire l'extrait à l'échelle de la caméra plutôt qu'en x3 (2,25 fois moins de pixels) a ramené un rendu de plusieurs dizaines de minutes à quelques minutes. Pour moins encore : moins de copies (4 au lieu de 6) ou un obturateur plus court, au prix d'un flou en marches d'escalier sur les mouvements rapides. Les PNG d'une capture pèsent environ 300 Mo, sur le disque de WSL.
+
 ## Ce qui reste provisoire
 
 - Le style des gabarits de `compose` (`templates/hyperframes/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres par groupes de trois mots au plus sur un voile sombre. Les blocs du registre y sont restylés sobrement, sans charte : le style définitif viendra du design system vidéo, après des maquettes validées.
@@ -228,6 +272,8 @@ Une vidéo qui existe déjà s'ouvre par `uv run vf studio carte <id>` : sa cart
 | `dépôt de contenu … absent` | `git clone https://github.com/code-my-life/video-content.git ~/perso/video-content`, ou régler `VF_CONTENT`. |
 | `… est sur un disque Windows` | `export VF_MEDIA=~/studio/media`. |
 | `gsap : gsap.min.js : empreinte … au lieu de …` (ou une autre bibliothèque) | La copie installée a changé : `uv run vf doctor --install gsap`. |
+| `vf capture : … la variante scenario.patch ne s'applique pas` | Le commit de `source.json` et la variante ne vont plus ensemble : refaire la variante sur ce commit (« Tourner un plan d'app »). |
+| `vf capture : … champ « … »` | Le plan est refusé : corriger le champ nommé (`schemas/capture-plan.schema.json`). |
 | `hyperframes-render : … ne correspond pas au lock` | `toolchain/hyperframes/` a changé : reconstruire l'image (`uv run vf doctor --install hyperframes-render` refusera l'ancien digest et affichera le nouveau), puis reporter `context_sha256`, `sha256` et `config_sha256` dans le lock, par PR. |
 
 | Message de `vf run` | Réparation |

@@ -17,11 +17,11 @@ hits:
 
 ## Why this shape
 
-Nothing unverified reaches the tools directory: a download is hashed while it is written and deleted on a gap; archives go through the "data" extraction filter; a source archive must also carry the pinned commit in its pax header; the npm lockfile must pin the very tarball whose SHA-256 was just checked. Work happens in a scratch directory next to the tools so the final rename never crosses file systems.
+Nothing unverified reaches the tools directory: a download is hashed while it is written and deleted on a gap; tar archives go through the "data" extraction filter, a zip (Chrome for Testing ships so) is extracted file by file, refusing any absolute name, any `..` and any link, each file with its Unix executable bit; a source archive must also carry the pinned commit in its pax header; the npm lockfile must pin the very tarball whose SHA-256 was just checked. Work happens in a scratch directory next to the tools so the final rename never crosses file systems.
 
 ## If you change this
 
-- **Hits:** the stamps [doctor](doctor.md) reads (`.vf-build.json`, `.vf-install.json`); the fields of each kind in the [tools lock](../toolchain/tools-lock.md) and its schema; `tests/test_install.py`; the update procedure in `docs/RUNBOOK.md`, whose tree digest command calls `extract`.
+- **Hits:** `tests/test_capture.py` (zip extraction); the stamps [doctor](doctor.md) reads (`.vf-build.json`, `.vf-install.json`); the fields of each kind in the [tools lock](../toolchain/tools-lock.md) and its schema; `tests/test_install.py`; the update procedure in `docs/RUNBOOK.md`, whose tree digest command calls `extract`.
 - **Does not hit:** the Python dependencies (`uv.lock`), which uv installs, or the content clone.
 
 ## See
