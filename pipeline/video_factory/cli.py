@@ -19,6 +19,7 @@ from video_factory import (
     install,
     lock,
     media,
+    montage,
     paths,
     publish,
     state,
@@ -145,12 +146,24 @@ def run_publish(video_id: str, home: Path) -> int:
             print(f"  {line}", file=sys.stderr)
         return 1
     out = publish.write(ready, places.media, video_id)
+    if ready.cover is not None:
+        try:
+            toolbox = Toolbox(lock.load(paths.LOCK_FILE), places.tools)
+            work = places.media / "vitrine" / "travail" / f"vignette-{video_id}"
+            publish.render_cover(toolbox, ready.cover, out / publish.FILES["tiktok"], work, out / publish.COVER_NAME)
+        except (publish.PublishError, montage.MontageError, lock.LockError, ToolError, media.MediaError) as exc:
+            print(f"vf publish : {exc}", file=sys.stderr)
+            return 1
     print(f"vf publish : prêt à publier à la main, dans {out}")
     for name in publish.FILES.values():
         print(f"  {name}")
+    if ready.cover is not None:
+        print(f"  {publish.COVER_NAME} : « {' / '.join(ready.cover.lines)} », image à {ready.cover.at} s")
     print(f"  {publish.CAPTION_NAME} :")
     for line in ready.caption.splitlines():
         print(f"    {line}")
+    for reminder in ready.reminders:
+        print(reminder)
     return 0
 
 
