@@ -21,6 +21,7 @@ from typing import override
 
 from video_factory import __version__, frontmatter, publish, videos
 from video_factory.paths import REPO_ROOT
+from video_factory.studio import api
 from video_factory.studio.board import BoardError
 from video_factory.studio.lanes import Studio, tail
 from video_factory.studio.stations import BY_KEY, READY_TO_POST, Card, last_park
@@ -235,6 +236,9 @@ def handler_for(studio: Studio) -> type[BaseHTTPRequestHandler]:
         @override
         def do_GET(self) -> None:
             path = urllib.parse.urlsplit(self.path).path
+            if path.startswith("/api/"):
+                self.api_get(path)
+                return
             try:
                 if path == "/":
                     self.reply(200, pages.index())
@@ -250,6 +254,42 @@ def handler_for(studio: Studio) -> type[BaseHTTPRequestHandler]:
                     self.reply(404, layout("Introuvable", "<h1>Introuvable</h1>"))
             except BoardError as exc:
                 self.reply(502, layout("Board", f"<h1>Board injoignable</h1><pre>{html.escape(str(exc))}</pre>"))
+
+        def api_get(self, path: str) -> None:
+            """The generic workflow API (#21): JSON only, versioned, an error being a JSON message too."""
+            try:
+                if path == "/api/workflow":
+                    self.reply_json(200, {"api": api.API_VERSION, "sheet": api.load_sheet()})
+                elif path == "/api/items":
+                    self.reply_json(200, {"api": api.API_VERSION, "items": api.items(studio)})
+                elif found := re.fullmatch(rf"/api/items/({VIDEO_ID})", path):
+                    self.reply_json(200, {"api": api.API_VERSION} | api.detail(studio, found[1]))
+                elif found := re.fullmatch(rf"/api/items/({VIDEO_ID})/words", path):
+                    self.reply_json(200, {"api": api.API_VERSION, "words": api.words(studio, found[1])})
+                else:
+                    self.reply_json(404, {"message": "route inconnue"})
+            except api.ApiError as exc:
+                self.reply_json(404, {"message": str(exc)})
+            except BoardError as exc:
+                self.reply_json(502, {"message": f"board injoignable : {exc}"})
+
+        def api_gesture(self, video_id: str) -> None:
+            size = int(self.headers.get("Content-Length") or 0)
+            try:
+                body = json.loads(self.rfile.read(size) or b"{}")
+                decision, note = str(body.get("decision", "")), str(body.get("note") or "")
+            except (ValueError, AttributeError):
+                self.reply_json(400, {"message": "corps JSON attendu : decision et note"})
+                return
+            try:
+                card = api.gesture(studio, video_id, decision, note)
+            except api.ApiError as exc:
+                self.reply_json(400, {"message": str(exc)})
+                return
+            except BoardError as exc:
+                self.reply_json(409, {"message": str(exc)})
+                return
+            self.reply_json(200, {"api": api.API_VERSION, "card": card.id, "decision": decision})
 
         def stream(self, file: Path | None) -> None:
             """A stored file, with byte ranges: Safari plays a video only from ranges."""
@@ -305,6 +345,9 @@ def handler_for(studio: Studio) -> type[BaseHTTPRequestHandler]:
         @override
         def do_POST(self) -> None:
             path = urllib.parse.urlsplit(self.path).path
+            if found := re.fullmatch(rf"/api/items/({VIDEO_ID})/gesture", path):
+                self.api_gesture(found[1])
+                return
             try:
                 if path == "/nouvelle":
                     fields = self.form()

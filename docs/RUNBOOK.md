@@ -243,6 +243,20 @@ Une vidéo qui existe déjà s'ouvre par `uv run vf studio carte <id>` : sa cart
 - La page répond sur `http://127.0.0.1:8448/sante` ; `tailscale serve status` montre sa publication sur le port 8448.
 - Les captures d'écran d'une vidéo (`[capture: …]`) se versent encore par `uv run vf ingest <id> --capture <nom> <fichier>`.
 
+### L'API du workflow, pour factory-live
+
+Le service sert aussi l'API générique du workflow (ADR 0006), en JSON :
+
+| Besoin | Commande |
+| --- | --- |
+| La fiche du studio | `curl -s 127.0.0.1:8448/api/workflow` (source : `hermes/workflow.json`) |
+| Les vidéos et leur état | `curl -s 127.0.0.1:8448/api/items` |
+| Une vidéo, ses étapes et ses fichiers | `curl -s 127.0.0.1:8448/api/items/<id>` |
+| Les mots du master | `curl -s 127.0.0.1:8448/api/items/<id>/words` |
+| Le geste du propriétaire | `POST /api/items/<id>/gesture` avec `{"decision": "ok" \| "refaire", "note": "…"}` |
+
+Changer une station ou sa place dans le graphe de factory-live : modifier `hermes/workflow.json` (le test `tests/test_api.py` vérifie qu'elle suit le manifeste et le contrat de factory-live).
+
 ## Monter un outil de version
 
 1. Télécharger le nouveau fichier dans un dossier vide, et calculer son empreinte (`sha256sum`). Une empreinte se calcule toujours sur le fichier téléchargé, jamais recopiée d'une page.
