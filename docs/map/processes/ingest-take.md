@@ -14,7 +14,7 @@ produces:
 
 # ingest a take or a capture
 
-`vf ingest <id> <takes>`, `vf ingest <id> --voix <file>` (the voice of a showcase) and `vf ingest <id> --capture <name> <file>` bring outside files into a video.
+`vf ingest <id> <takes>`, `vf ingest <id> --voix <file>` (the voice of a showcase) and `vf ingest <id> --capture <name> <file>` bring outside files into a video, from the command line or from the studio page (a showcase's audio file as its voice, each other file as the capture of its name).
 
 ## Input, movement, output
 

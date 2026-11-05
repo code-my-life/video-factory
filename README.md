@@ -13,7 +13,7 @@ Ce dépôt est public et ne contient que le moteur : le code de la commande `vf`
 
 Pour les vidéos vitrine, `vf capture` filme la vraie app (sa démo, à horloge simulée) et en fait des plans cadrés en vertical, refaits à l'identique ([#19](https://github.com/code-my-life/video-factory/issues/19), RUNBOOK, « Tourner un plan d'app ») ; ils entrent dans une vidéo comme toute capture.
 
-Une vitrine a son propre script (`vf new <id> --vitrine`) : chaque réplique de la voix avec ses plans, et en tête ses réglages (thème, bandeau, vignette), des choix de la vidéo, révisables. Sa voix est un fichier, généré (ElevenLabs pour la vidéo 1) ou enregistré : `vf voix` en écrit le texte, `vf ingest --voix` la range, `transcribe` et `align` calent chaque mot du script sur elle. Son montage par `vf run` arrive avec [#28](https://github.com/code-my-life/video-factory/issues/28) (RUNBOOK, « Une vitrine »).
+Une vitrine a son propre script (`vf new <id> --vitrine`) : chaque réplique de la voix avec ses plans, et en tête ses réglages (thème, bandeau, vignette), des choix de la vidéo, révisables. Sa voix est un fichier, généré (ElevenLabs pour la vidéo 1) ou enregistré : `vf voix` en écrit le texte, `vf ingest --voix` la range, `transcribe` et `align` calent chaque mot du script sur elle. Puis `vf run` la monte dans le thème du script (Primer pour la vidéo 1), et `vf publish` ajoute sa vignette ([#28](https://github.com/code-my-life/video-factory/issues/28), RUNBOOK, « Une vitrine »).
 
 Le board Hermès « studio » suit chaque vidéo de l'idée à la publication et prévient le propriétaire sur Telegram à chaque station qui l'attend ; la page du tailnet reçoit les prises depuis l'iPhone ([#7](https://github.com/code-my-life/video-factory/issues/7), RUNBOOK, « Le board studio »).
 
@@ -56,7 +56,7 @@ uv run vf run ma-video       # jusqu'au master et à son contrôle
 | `uv run vf run <id> [--refaire <étape …>]` | Passe les étapes (`transcribe`, `align`, `cut`, `voice`, `compose`, `master`, `qc`) qui n'ont jamais tourné ou sont périmées, puis donne le master 1440x2560 et l'export TikTok 1080x1920. Code 1 si `qc` refuse le master. |
 | `uv run vf status <id>` | Liste les fichiers rangés (voix, prises, captures), puis dit, étape par étape, ce qui est à jour, périmé (et pourquoi) ou en attente. |
 | `uv run vf capture <plan.json>` | Tourne un plan d'app pour une vidéo vitrine : construit la démo de l'app (`vitrine/<app>/`, au commit figé, avec sa variante de scénario), la pilote avec Playwright à horloge simulée, en x3, image par image, et écrit les images, la position des éléments suivis et leurs empreintes, qui disent si deux captures du même plan sont identiques. Si le plan a une caméra : la scène HyperFrames « caméra qui suit », vérifiée, rendue sans réseau et mesurée. |
-| `uv run vf publish <id>` | Vérifie que le master passe qc, puis range dans `VF_MEDIA/publication/<id>/` l'export TikTok, le master et la légende (le titre, le crédit du robot). Ne publie rien. |
+| `uv run vf publish <id>` | Vérifie que le master passe qc, puis range dans `VF_MEDIA/publication/<id>/` l'export TikTok, le master, la légende (le sujet, la voix générée par IA s'il y a lieu, le crédit du robot, les mots-clés) et, pour une vitrine, sa vignette. Rappelle l'étiquette IA quand la voix est générée. Ne publie rien. |
 | `uv run vf studio carte <id> ["idée"]` | Ouvre la carte de la vidéo sur le board « studio » : à Idée pour une nouvelle vidéo, sinon à la station que son état prouve. |
 | `uv run vf studio serve`, `uv run vf studio tick` | La page des prises et les voies du board (le service installé par `hermes/install.sh`), ou une seule passe au premier plan. |
 
@@ -74,6 +74,7 @@ FFmpeg statique, whisper.cpp et son modèle large-v3-turbo, HyperFrames et son i
 - [docs/decisions/0004-board-studio.md](docs/decisions/0004-board-studio.md) : le board Hermès « studio », ses stations, ses voies sans modèle et la page des prises.
 - [docs/decisions/0005-capture-pilotee-et-camera-qui-suit.md](docs/decisions/0005-capture-pilotee-et-camera-qui-suit.md) : `vf capture`, la variante de scénario de factory-live et la scène « caméra qui suit ».
 - [docs/decisions/0006-api-generique-du-workflow.md](docs/decisions/0006-api-generique-du-workflow.md) : la fiche du workflow et l'API générique que factory-live lit.
+- [docs/decisions/0007-vitrine-dans-la-chaine.md](docs/decisions/0007-vitrine-dans-la-chaine.md) : la vitrine dans la chaîne, son script, ses règles de montage, ses thèmes et la zone sûre.
 - [.claude/skills/video-factory/SKILL.md](.claude/skills/video-factory/SKILL.md) : le skill des agents, du script annoté aux scènes.
 - [docs/map/AGENTS.md](docs/map/AGENTS.md) : la carte du dépôt (ICM, en anglais).
 

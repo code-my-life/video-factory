@@ -16,7 +16,7 @@ The registry of steps (order, upstream steps, tools, code files), the staleness 
 
 ## Why this shape
 
-Comparing fingerprints, tool versions, parameters and a fingerprint of each step's own sources means a change anywhere that matters marks the step stale, and an unchanged output stops the cascade (criterion C4). Compose's sources include every file of `templates/hyperframes/` except `camera-follow/` and `phone/`, the scenes of `vf capture`, which compose never reads (#19, #22).
+Comparing fingerprints, tool versions, parameters (as JSON keeps them, a tuple being a list once read back) and a fingerprint of each step's own sources means a change anywhere that matters marks the step stale, and an unchanged output stops the cascade (criterion C4). Compose's sources include every file of `templates/hyperframes/` except `camera-follow/` and `phone/`, the scenes of `vf capture`, which compose never reads (#19, #22).
 
 ## If you change this
 

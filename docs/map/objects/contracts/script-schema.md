@@ -13,7 +13,7 @@ hits:
 
 # script schema
 
-`schemas/script.schema.json`: the front matter of `script.md`: `id`, `titre`, `plateforme` (tiktok) and `duree_visee`, a whole number of seconds from 61 to 65 (the owner's decision of 2026-11-04). These two bounds are the only place the duration of a video is written: `qc` reads them for the master. A showcase adds `genre: vitrine` (`face-camera` otherwise) and must name its `theme`; `bandeau`, `vignette` and `vignette_image` (a second of the video, with a decimal comma or point) are optional. Their meaning is read by [vitrine](../pipeline/vitrine.md).
+`schemas/script.schema.json`: the front matter of `script.md`: `id`, `titre`, `plateforme` (tiktok) and `duree_visee`, a whole number of seconds from 61 to 65 (the owner's decision of 2026-11-04). These two bounds are the only place the duration of a video is written: `qc` reads them for the master. A showcase adds `genre: vitrine` (`face-camera` otherwise) and must name its `theme`; `bandeau`, `vignette`, `vignette_image` (a second of the video, with a decimal comma or point), `icone` and `ecran_fin` are optional. Any script may give `legende`, `mots_cles` and `voix_ia` for its caption ([publish](../pipeline/publish.md)). Their meaning is read by [vitrine](../pipeline/vitrine.md).
 
 ## Why this shape
 

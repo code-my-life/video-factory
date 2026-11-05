@@ -11,7 +11,7 @@ hits:
 
 # lanes
 
-`Studio`: one pass reads the board, decides each card and carries the plan out; the code lanes run `vf new`, `vf run` and `vf publish`, the Script station asks `studio-writer` for a draft, and a park sends the owner a Telegram message. Long jobs run one at a time beside the passes. It also opens a video's card and acts on the page's gestures and takes.
+`Studio`: one pass reads the board, decides each card and carries the plan out; the code lanes run `vf new`, `vf run` and `vf publish`, the Script station asks `studio-writer` for a draft, and a park sends the owner a Telegram message. Long jobs run one at a time beside the passes. It also opens a video's card and acts on the page's gestures and takes. For a showcase the received files become `vf ingest --voix` (the audio file) and `--capture <name>` (each other file, under the name it was sent with), and the card goes to Montage only once the video is shot.
 
 ## Why this shape
 

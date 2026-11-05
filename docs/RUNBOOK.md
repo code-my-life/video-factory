@@ -205,16 +205,20 @@ Le flou coûte parce que chaque copie est une couche de 2880x3200 à composer ; 
 
 ## Une vitrine
 
-Une vitrine montre une app : la voix, réplique par réplique, sur des plans de l'app (`vf capture`) et des rushs ([#28](https://github.com/code-my-life/video-factory/issues/28)).
+Une vitrine montre une app : la voix, réplique par réplique, sur des plans de l'app (`vf capture`) et des rushs ([#28](https://github.com/code-my-life/video-factory/issues/28), ADR 0007). La vidéo 1 (`vitrine-factory-live`) en est une.
 
 ```bash
 uv run vf new ma-vitrine --vitrine   # le script, depuis templates/script-vitrine.md
 # écrire les répliques, puis :
 uv run vf voix ma-vitrine            # le texte à coller dans ElevenLabs (--modele v2 pour Multilingual v2)
 uv run vf ingest ma-vitrine --voix ~/inbox/voix.mp3 --capture plan1 ~/inbox/plan1.mp4 --capture rush-pr ~/inbox/rush.mp4
-uv run vf run ma-vitrine             # ingest, transcribe et align : chaque mot du script et son instant
+uv run vf ingest ma-vitrine --capture icone ~/inbox/icon.png    # l'icône de l'app, si le script la nomme
+uv run vf run ma-vitrine             # jusqu'au master et à son contrôle, comme toute vidéo
 uv run vf status ma-vitrine          # les fichiers rangés, puis les étapes
+uv run vf publish ma-vitrine         # l'export, le master, la légende et la vignette
 ```
+
+Depuis le board, la page des prises reçoit les mêmes fichiers au Tournage : le fichier audio est la voix, et chaque autre fichier est rangé comme la capture de son nom (« plan1.mp4 » pour `[plan: plan1]`). La carte passe en Montage quand la voix et toutes les captures que le script montre sont rangées.
 
 L'en-tête porte les réglages de la vidéo. Chacun est un choix de cette vidéo, révisable, jamais une constante de la chaîne :
 
@@ -225,16 +229,20 @@ L'en-tête porte les réglages de la vidéo. Chacun est un choix de cette vidéo
 | `bandeau: "titre \| texte \| début \| durée"` | L'appel du milieu de la vidéo, en secondes de la vidéo. |
 | `vignette: "ligne \| ligne avec un *mot*"` | Le texte de la vignette ; le mot entre astérisques prend la couleur d'accent. |
 | `vignette_image: "52,95"` | La seconde de la vidéo dont l'image porte la vignette. |
+| `icone: icone` | La capture de l'icône de l'app, sur le bandeau et l'écran de fin. |
+| `ecran_fin: "factory-live \| Open source · MIT \| github"` | Le nom de l'écran de fin, puis son badge et l'icône du badge (une icône du thème). |
+| `legende`, `mots_cles` | La phrase du sujet en tête de la légende (le titre sinon), et ses mots-clés en fin de légende. Toute vidéo peut les donner. |
+| `voix_ia: ElevenLabs` | L'outil qui a généré la voix : la légende le dit et `vf publish` rappelle l'étiquette IA. Toute vidéo peut le donner. |
 
 Chaque ligne est une réplique, dans l'ordre où la voix la dit. Ses annotations la placent sur ses plans et n'ajoutent aucun mot dit :
 
 | Annotation | Effet |
 | --- | --- |
 | `[plan: plan1 \| depuis 0,3 \| durée 4,6 \| voix 0,15]` | Un plan tiré de la capture rangée sous ce nom (un plan de `vf capture` ou un rush), depuis sa seconde `depuis`, pendant `durée` ; la réplique commence `voix` secondes après le début du plan. Plusieurs `plan` sur une ligne se suivent. |
-| `[jumeaux: rush-pr \| … \| avant 0 362 \| après 960 362 \| taille 940 612 \| volet 1,3 0,5]` | Les jumeaux d'une PR dans un enregistrement d'écran : le volet « avant », puis le volet « après », de même taille, avec un balayage de l'un à l'autre (son début et sa durée, en secondes dans le plan). |
+| `[jumeaux: rush-pr \| … \| avant 0 362 \| après 960 362 \| taille 940 612 \| volet 1,3 0,5 \| étiquettes Avant · sans la PR / Après · PR #37]` | Les jumeaux d'une PR dans un enregistrement d'écran : le volet « avant », puis le volet « après », de même taille et sous leurs étiquettes, avec un balayage de l'un à l'autre (son début et sa durée, en secondes dans le plan). Une seule paire par vidéo. |
 | `[suite: voix 3,7]` | La réplique continue dans le plan de la réplique d'avant. |
-| `[fin: voix 0,4]` | La réplique se dit sur l'écran de fin, jusqu'à la durée visée. |
-| `[appel: github \| titre \| texte]` | Une ligne de l'écran de fin, allumée quand la voix dit le mot qui précède. |
+| `[fin: voix 0,4]` | La réplique se dit sur l'écran de fin, jusqu'à la durée visée. Seulement la dernière réplique. |
+| `[appel: github \| titre \| texte]` | Une ligne de l'écran de fin, allumée quand la voix dit le mot qui précède ; l'icône est une icône du thème. |
 | `[ton: chuckles]` | Une indication de jeu pour ElevenLabs, avant le mot qui suit ; seul `vf voix` la lit. |
 
 Les temps prennent une virgule ou un point. Une réplique a des `plan` ou des `jumeaux`, ou `suite`, ou `fin`. Une erreur nomme la ligne du fichier.
@@ -243,11 +251,15 @@ Les temps prennent une virgule ou un point. Une réplique a des `plan` ou des `j
 - **`vf voix`** écrit `videos/<id>/voix-elevenlabs.txt` dans `video-content` : les répliques dans l'ordre, avec leurs tons et `[short pause]` entre deux répliques pour Eleven v3 (pas de pause avant une réplique qui commence par un ton), ou une pause de 0,8 s sans ton pour Multilingual v2 (`--modele v2`). Si la voix générée s'écarte du texte, corriger le script : c'est lui que les sous-titres affichent.
 - **Les rushs** se rangent comme les plans de `vf capture`, par `--capture <nom>` : nettoyés, sans son, à 30 images par seconde.
 - **`align`** donne à chaque mot du script son instant dans la voix, sous sa forme écrite. Un mot mal entendu par whisper prend le texte du script (« Cloud » pour « Claude »), un mot entendu en morceaux prend le temps de ses morceaux (« Factory » « Live » pour « factory-live »), et un mot avalé (« l'EPR » pour « les PR ») partage le temps de son voisin.
+- **`cut`** fait la liste de décisions de la vitrine. Les plans se suivent dans l'ordre des répliques, puis l'écran de fin jusqu'à la durée visée. La voix d'une réplique va de la fin du silence qui la précède au début du silence qui la suit (les silences de `transcribe`), avec 60 ms avant et 120 ms après. Elle commence `voix` secondes après le début de son plan.
+- **Les sous-titres** sont les mots du script, par groupes de trois au plus. Un groupe se ferme après une ponctuation ou avant une vraie pause (plus de 0,35 s). Un mot de trois lettres au plus attend le suivant plutôt que de rester seul. Une réplique de quatre mots au plus reste entière. Un groupe reste 0,5 s après son dernier mot, jusqu'au groupe suivant.
+- **`voice`** place la voix réplique par réplique, puis l'amène à -14 LUFS comme toute voix. **`compose`** écrit le projet HyperFrames dans le thème du script (`templates/hyperframes/themes/<thème>/`) et le rend. Un plan déjà en 1440x2560 à 30 i/s est repris tel quel ; un rush est mis à cette taille (il doit être en 9:16). Pas de musique sous une vitrine pour l'instant : une piste muette en tient lieu. **`master`** et **`qc`** sont ceux de toute vidéo, zone sûre comprise pour tout le texte, bandeau et écran de fin aussi.
+- **`vf publish`** range aussi la vignette (`couverture.png`), l'image de l'export TikTok à `vignette_image` sous le texte de la vignette, rendue par le Chromium figé.
 
 ## Ce qui reste provisoire
 
 - Le style des gabarits de `compose` (`templates/hyperframes/`) : une police (Inter Bold, OFL), du texte blanc, des plans sur fond noir, les sous-titres par groupes de trois mots au plus sur un voile sombre. Les blocs du registre y sont restylés sobrement, sans charte : le style définitif viendra du design system vidéo, après des maquettes validées.
-- Le montage d'une vitrine : `vf run` s'arrête après `align` jusqu'à la PR 2 de #28 (`compose` pour une vitrine, ses thèmes, la vignette dans `vf publish`).
+- Sous une vitrine, pas de musique : une piste muette en tient lieu.
 - Le seuil de silence de `transcribe` (-40 dB), le lexique des hésitations (`align.FILLERS`), la couleur « casque » (`voice.HELMET`) : à régler sur les premières vraies prises.
 
 ## Le board « studio »
