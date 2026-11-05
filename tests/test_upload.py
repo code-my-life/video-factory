@@ -9,6 +9,7 @@ import json
 import shutil
 import subprocess
 import threading
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -16,8 +17,8 @@ import pytest
 from test_board import FakeVf
 from video_factory import videos
 from video_factory.paths import REPO_ROOT, SCRIPT_TEMPLATE, Places
-from video_factory.studio.lanes import Jobs, Studio
-from video_factory.studio.page import server, staging
+from video_factory.studio.lanes import Jobs, Studio, capture_name
+from video_factory.studio.page import server, staging, stem_of
 
 NOW = "2026-11-04T14:00:00Z"
 TAKE = bytes(range(256)) * 4099  # a little over 1 MiB, so it arrives in more than one chunk
@@ -130,3 +131,11 @@ def test_the_phone_computes_the_same_fingerprint_as_the_server(tmp_path: Path):
             check=True,
         ).stdout
         assert found == hashlib.sha256(TAKE[:size]).hexdigest()
+
+
+def test_a_received_file_keeps_its_name_so_a_showcase_stores_each_rush_as_the_capture_its_script_names():
+    assert stem_of("IMG 0042.MOV") == "img-0042"
+    assert stem_of(urllib.parse.quote("Plan5-PR (prod).mp4")) == "plan5-pr-prod"
+    assert stem_of("...") == "fichier"
+    assert capture_name(Path("001-plan5-pr.mp4")) == "plan5-pr"
+    assert capture_name(Path("plan1.mp4")) == "plan1"

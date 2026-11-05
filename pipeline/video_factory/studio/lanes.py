@@ -9,6 +9,7 @@ a time beside the passes, so an answer of the owner is acted on while a master r
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -17,8 +18,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from video_factory import videos
-from video_factory.paths import REPO_ROOT, SCRIPT_TEMPLATE, Places
+from video_factory import script, videos
+from video_factory.paths import REPO_ROOT, SCRIPT_TEMPLATE, SCRIPT_VITRINE_TEMPLATE, Places
 from video_factory.studio import notify, writer
 from video_factory.studio.board import Board, BoardError
 from video_factory.studio.stations import (
@@ -81,6 +82,16 @@ class Jobs:
         return True
 
 
+# The audio files a showcase's voice may come in; any other received file is a capture.
+AUDIO = frozenset({"mp3", "wav", "m4a", "aac", "flac", "ogg", "opus"})
+
+
+def capture_name(file: Path) -> str:
+    """The capture a received file is stored as: its name as sent, without its rank (« 001-plan1.mp4 » is « plan1 »)."""
+    stem = file.stem.split("-", 1)[1] if re.match(r"^\d{3}-", file.stem) else file.stem
+    return stem or file.stem
+
+
 @dataclass
 class Studio:
     board: Board
@@ -103,6 +114,18 @@ class Studio:
     def template(self, video_id: str) -> str:
         return videos.script_text(SCRIPT_TEMPLATE.read_text(encoding="utf-8"), video_id)
 
+    def templates(self, video_id: str) -> tuple[str, ...]:
+        """The scripts `vf new` writes for this id, face camera and showcase: a script equal to one is unwritten."""
+        showcase = videos.script_text(SCRIPT_VITRINE_TEMPLATE.read_text(encoding="utf-8"), video_id)
+        return (self.template(video_id), showcase)
+
+    def is_showcase(self, video_id: str) -> bool:
+        try:
+            text = (self.folder(video_id) / videos.SCRIPT_NAME).read_text(encoding="utf-8")
+            return script.genre_of(text) == script.VITRINE
+        except (OSError, ValueError):
+            return False
+
     def facts(self, video_id: str) -> Facts:
         folder = self.folder(video_id)
         try:
@@ -113,7 +136,7 @@ class Studio:
             script = (folder / videos.SCRIPT_NAME).read_text(encoding="utf-8")
         except OSError:
             script = ""
-        return facts_of(state, script == self.template(video_id))
+        return facts_of(state, script in self.templates(video_id), script)
 
     # --- the passes ---------------------------------------------------------------------------------------------------
 
@@ -296,12 +319,30 @@ class Studio:
             self.board.unblock(card.id, reason)
             return card
 
+    def ingest_args(self, video_id: str, files: Sequence[Path]) -> list[str]:
+        """What `vf ingest` gets from the received files: the takes of a face camera video; for a showcase, its voice
+        (the audio file) and its captures, each under the name of its file (« plan1.mp4 » is the capture « plan1 »)."""
+        if not self.is_showcase(video_id):
+            return [str(file) for file in files]
+        found: list[str] = []
+        voices = [file for file in files if file.suffix.lower().lstrip(".") in AUDIO]
+        if len(voices) > 1:
+            raise BoardError(f"une seule voix par vitrine : {len(voices)} fichiers audio reçus")
+        for file in files:
+            if file in voices:
+                found += ["--voix", str(file)]
+            else:
+                found += ["--capture", capture_name(file), str(file)]
+        return found
+
     def takes_received(self, video_id: str, files: Sequence[Path]) -> subprocess.CompletedProcess:
-        """`vf ingest` on the received takes, then the card goes to Montage (the state now has its takes)."""
-        done = self.vf(["ingest", video_id, *map(str, files)])
+        """`vf ingest` on the received files, then the card goes to Montage once the state proves the video shot: its
+        takes, or a showcase's voice and every capture its script shows."""
+        done = self.vf(["ingest", video_id, *self.ingest_args(video_id, files)])
         if done.returncode == 0:
             with self.lock:
                 card = self.card_of_video(video_id)
-                if card is not None and card.station is not None and card.station.key == "tournage":
+                station = card.station if card is not None else None
+                if station is not None and station.key == "tournage" and self.facts(video_id).takes:
                     self.move(card, "montage")
         return done

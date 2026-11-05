@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from video_factory import store, videos
-from video_factory.paths import SCRIPT_TEMPLATE, Places
+from video_factory.paths import SCRIPT_TEMPLATE, SCRIPT_VITRINE_TEMPLATE, Places
 from video_factory.studio import notify, writer
 from video_factory.studio.board import Board, card_of
 from video_factory.studio.lanes import Jobs, Studio
@@ -57,14 +57,31 @@ class FakeVf:
         change(state)
         path.write_text(json.dumps(state), encoding="utf-8")
 
+    def ingest(self, state: dict, files: list[str]) -> None:
+        """Takes as given, a showcase's voice after --voix, a capture after --capture <name>; then the ingest step."""
+        media, takes = self.places.media, []
+        while files:
+            item = files.pop(0)
+            if item == "--voix":
+                state["voix"] = store.put(media, Path(files.pop(0)), "mp3", keep_source=True)
+            elif item == "--capture":
+                name, file = files.pop(0), Path(files.pop(0))
+                found = store.put(media, file, "mp4", keep_source=True)
+                state.setdefault("captures", {})[name] = found | {"kind": "video", "source_sha256": found["sha256"]}
+            else:
+                takes.append(store.put(media, Path(item), "mov", keep_source=True))
+        if takes:
+            state["takes"] = takes
+        if takes or "voix" in state:
+            state["steps"] = {"ingest": {}}
+
     def __call__(self, args: Sequence[str]) -> subprocess.CompletedProcess:
         self.calls.append(list(args))
         verb, video_id, *rest = args
         if verb == "new":
             videos.create(self.places.content, video_id, SCRIPT_TEMPLATE.read_text(encoding="utf-8"), NOW)
         elif verb == "ingest":
-            takes = [store.put(self.places.media, Path(file), "mov", keep_source=True) for file in rest]
-            self.update(video_id, lambda state: state.update(takes=takes, steps={"ingest": {}}))
+            self.update(video_id, lambda state: self.ingest(state, list(rest)))
         elif verb == "run":
             self.status_during_run += [self.board.statuses(card) for card in self.board.tasks]
             if self.fail_run:
@@ -365,3 +382,29 @@ def test_a_failed_command_is_reported_from_its_own_last_message():
     noisy = done(returncode=1, stderr="INFO: delegate\nvf run : qc refuse le master\n  durée : 6,00 s\n")
     assert tail(noisy) == "vf run : qc refuse le master durée : 6,00 s"
     assert tail(done(returncode=1, stderr="Traceback\nboom")) == "Traceback boom"
+
+
+@pytest.mark.acceptance("une vitrine passe du Tournage au Montage quand sa voix et ses rushs sont rangés")
+def test_a_showcase_goes_from_shooting_to_montage_once_its_voice_and_its_rushes_are_stored(studio, tmp_path):
+    board = studio.board
+    folder = videos.create(studio.places.content, "vitrine", SCRIPT_VITRINE_TEMPLATE.read_text(encoding="utf-8"), NOW)
+    lines = "Coucou. [plan: plan1 | durée 30]\nÀ bientôt. [plan: rush-pr | durée 32]\n"
+    (folder / "script.md").write_text((folder / "script.md").read_text(encoding="utf-8") + lines, encoding="utf-8")
+    card = studio.open_card("vitrine", "")
+    studio.tick()  # the written script waits for the owner's approval
+    assert station(board, card) == "approbation/scheduled"
+    board.unblock(card)
+    studio.tick()
+    assert station(board, card) == "tournage/scheduled"
+    files = {name: tmp_path / name for name in ("voix.mp3", "000-plan1.mp4", "001-rush-pr.mp4")}
+    for name, path in files.items():
+        path.write_bytes(name.encode())
+    # The voice alone: the rushes the script shows are still missing, the card waits.
+    assert studio.takes_received("vitrine", [files["voix.mp3"]]).returncode == 0
+    assert studio.vf.calls[-1] == ["ingest", "vitrine", "--voix", str(files["voix.mp3"])]
+    assert station(board, card) == "tournage/scheduled"
+    # The rushes, each stored under the name of its file: the video is shot, the card goes to Montage.
+    assert studio.takes_received("vitrine", [files["000-plan1.mp4"], files["001-rush-pr.mp4"]]).returncode == 0
+    assert studio.vf.calls[-1][2:] == ["--capture", "plan1", str(files["000-plan1.mp4"]), "--capture", "rush-pr",
+                                       str(files["001-rush-pr.mp4"])]  # fmt: skip
+    assert station(board, card) == "montage/ready"
