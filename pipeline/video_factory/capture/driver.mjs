@@ -136,8 +136,14 @@ const easeInOut = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? 4 * p ** 3 : 1 - (
 async function applyScroll() {
   if (!scrolling) return;
   const progress = (elapsed - scrolling.start) / scrolling.duration;
-  const y = scrolling.from + (scrolling.to - scrolling.from) * easeInOut(progress);
-  await page.evaluate(({ y }) => window.__vfScroller().scrollTop = y, { y });
+  const done = easeInOut(progress);
+  const y = scrolling.from + (scrolling.to - scrolling.from) * done;
+  const x = scrolling.fromX + (scrolling.toX - scrolling.fromX) * done;
+  await page.evaluate(({ x, y }) => {
+    const scroller = window.__vfScroller();
+    scroller.scrollTop = y;
+    scroller.scrollLeft = x;
+  }, { x, y });
   if (progress >= 1) scrolling = null;
 }
 async function runTo(ms) {
@@ -171,24 +177,30 @@ async function zoom(action) {
   return { from: before, to: await scaleOf(measure) };
 }
 
-// A scroll brings an element to `offset` CSS pixels below the top of the window, in `duration` seconds.
+// A scroll brings an element to `offset` CSS pixels below the top of the window and, with `left`, its left edge to
+// `left` pixels from the window's left, in `duration` seconds.
 async function scroll(action) {
   const box = await page.locator(action.selector).first().boundingBox();
   if (!box) throw new Error(`défilement : « ${action.selector} » n'est pas affiché`);
-  const from = await page.locator(action.selector).first().evaluate((element) => {
+  const horizontal = action.left !== undefined;
+  const [from, fromX] = await page.locator(action.selector).first().evaluate((element, horizontal) => {
     document.querySelector('[data-vf-scroller]')?.removeAttribute('data-vf-scroller');
     for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
       const style = getComputedStyle(node);
-      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) {
+      const vertical = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1;
+      const sideways = /(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1;
+      if (horizontal ? sideways : vertical) {
         node.setAttribute('data-vf-scroller', '');
         break;
       }
     }
-    return window.__vfScroller().scrollTop;
-  });
-  const to = Math.max(0, from + box.y - (action.offset ?? 120));
-  scrolling = { start: elapsed, duration: Math.max(1, (action.duration ?? 0.6) * 1000), from, to };
-  return { from, to };
+    const scroller = window.__vfScroller();
+    return [scroller.scrollTop, scroller.scrollLeft];
+  }, horizontal);
+  const to = action.offset === undefined && horizontal ? from : Math.max(0, from + box.y - (action.offset ?? 120));
+  const toX = horizontal ? Math.max(0, fromX + box.x - action.left) : fromX;
+  scrolling = { start: elapsed, duration: Math.max(1, (action.duration ?? 0.6) * 1000), from, to, fromX, toX };
+  return horizontal ? { from, to, from_x: fromX, to_x: toX } : { from, to };
 }
 
 // A gesture that fails leaves a picture of the page as it was (erreur.png), to see why.

@@ -145,7 +145,18 @@
         "at": { "$ref": "#/$defs/at" },
         "do": { "const": "scroll" },
         "selector": { "type": "string", "minLength": 1 },
-        "offset": { "type": "number", "minimum": 0, "maximum": 2560, "default": 120 },
+        "offset": {
+          "description": "Pixels CSS sous le haut de la fenêtre (120 par défaut, sauf pour un défilement seulement horizontal).",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2560
+        },
+        "left": {
+          "description": "Défilement horizontal : le bord gauche de l'élément vient à left pixels CSS du bord gauche de la fenêtre, dans le conteneur qui défile de côté autour de lui.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2560
+        },
         "duration": { "type": "number", "minimum": 0.2, "maximum": 3, "default": 0.6 }
       }
     },
