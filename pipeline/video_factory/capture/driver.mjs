@@ -1,6 +1,6 @@
 // vf capture's driver: the app's built demo, served on 127.0.0.1, driven by the pinned Playwright and Chromium on a
-// fake clock, frame by frame. Nothing here reads the real time: the clock is installed and paused before the page
-// loads (the demo's scenario starts at that instant), then only `clock.runFor` moves it. Motion's WAAPI animations
+// fake clock, frame by frame. Nothing here is meant to read the real time: the clock is installed and paused before
+// the page loads (the demo's scenario starts at that instant), then only `clock.runFor` moves it. Motion's WAAPI animations
 // would run in real time, so Element.prototype.animate is removed and Motion falls back to requestAnimationFrame,
 // which the fake clock drives; CSS animations and transitions (spinners, pulses) run on the real document timeline,
 // so each is paused when first seen, after any step of the clock, and set from the fake clock from then on.
