@@ -1,20 +1,21 @@
 """`align`: the transcript aligned on the script by dynamic programming, each spoken word labelled.
 
 The alignment reads the transcript word by word and moves along the script. Besides matching, inserting and deleting a
-word, and joining the pieces of a word whisper heard apart (« Factory » « Live » for « factory-live »), the speaker may
-restart (go back to an earlier word of the current or the previous sentence) or abandon a
-sentence (jump to its end). The cheapest path splits the transcript into attempts at each sentence; the last complete
-attempt of each sentence is kept, the other attempts are retakes. Then each word is:
+word, and joining the pieces of a word whisper heard apart (« Factory » « Live » for « factory-live », then one word of
+the document, from the start of its first piece to the end of its last), the speaker may restart (go back to an earlier
+word of the current or the previous sentence) or abandon a sentence (jump to its end). The cheapest path splits the
+transcript into attempts at each sentence; the last complete attempt of each sentence is kept, the other attempts are
+retakes. Then each word is:
 - « kept »: said in the kept attempt of its sentence, with the index of the script word it says;
 - « retake »: said in another attempt, or between two attempts of the same sentence;
 - « filler »: a hesitation of the French lexicon below, outside the script;
 - « off_script »: any other word that is not in the script.
 
 The document also gives each word of the script its time (« script_words »): the time of the spoken word kept for it,
-its written form whatever whisper heard (« Cloud » said for « Claude »), from the start of its first piece to the end of
-its last. A script word no spoken word was kept for (whisper heard « les PR » as one word,
-« l'EPR ») shares the time around it: the gap between its neighbours, or else the span of the neighbour that was heard
-longer than written, the one that swallowed it. A showcase's captions are read from them.
+its written form whatever whisper heard (« Cloud » said for « Claude »). A script word no spoken word was kept for
+(whisper heard « les PR » as one word, « l'EPR ») shares the time around it: the gap between its neighbours, or else the
+span of the neighbour that was heard longer than written, the one that swallowed it. A showcase's captions are read from
+them.
 """
 
 from __future__ import annotations
@@ -279,9 +280,8 @@ def script_times(aligned: Sequence[dict], script: Script) -> list[dict]:
     heard: dict[int, str] = {}
     for word in aligned:
         if word["label"] == KEPT and word["script"] is not None:
-            found = times[word["script"]]
-            times[word["script"]] = [word["start"], word["end"]] if found is None else [found[0], word["end"]]
-            heard[word["script"]] = heard.get(word["script"], "") + word["text"]
+            times[word["script"]] = [word["start"], word["end"]]
+            heard[word["script"]] = word["text"]
     surplus = {j: len(key(text)) - len(key(script.words[j].text)) for j, text in heard.items()}
     said = [found is not None for found in times]
     index = 0
@@ -341,19 +341,19 @@ def share(times: list[list[float] | None], first: int, end: int, surplus: dict[i
 
 
 def align(words: Sequence[dict], script: Script) -> dict:
-    """The alignment document: each transcript word with its label, and per sentence what was kept or missed."""
+    """The alignment document: each transcript word with its label (the pieces of a word heard apart joined into one),
+    the script words never said, and the time of each script word."""
     spoken = [normalize(word["text"]) for word in words]
     labelled = labels(spoken, script)
-    aligned = [
-        {
-            "text": word["text"].strip(),
-            "start": word["start"],
-            "end": word["end"],
-            "label": label,
-            "script": index,
-        }
-        for word, (label, index) in zip(words, labelled, strict=True)
-    ]
+    aligned: list[dict] = []
+    for word, (label, index) in zip(words, labelled, strict=True):
+        text = word["text"].strip()
+        previous = aligned[-1] if aligned else None
+        if label == KEPT and previous is not None and previous["label"] == KEPT and previous["script"] == index:
+            # Only a join keeps two spoken words in a row for one script word: they are one word, said once.
+            previous["text"], previous["end"] = f"{previous['text']} {text}", word["end"]
+            continue
+        aligned.append({"text": text, "start": word["start"], "end": word["end"], "label": label, "script": index})
     said = {index for label, index in labelled if label == KEPT}
     missing = [j for j in range(len(script.words)) if j not in said]
     return {"words": aligned, "missing": missing, "script_words": script_times(aligned, script)}

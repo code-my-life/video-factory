@@ -13,7 +13,7 @@ hits:
 
 # align
 
-`align`: dynamic programming over (transcript word, script position) with match, join (two or three spoken words that, put end to end, are exactly one written word: « Factory » « Live » for « factory-live »), insertion, deletion, restart (back into the current or previous sentence) and abandon (to the end of a sentence); the cheapest path splits the take into attempts, the last complete attempt of each sentence is kept, and each word becomes `kept`, `retake`, `filler` (French lexicon `FILLERS`) or `off_script`. The document also times each word of the script (`script_words`) in its written form, whatever whisper heard; a word no spoken word was kept for (« l'EPR » heard for « les PR ») shares the silence where it was said, or else the span of the neighbour heard longer than written. A showcase's captions will be read from them (#28).
+`align`: dynamic programming over (transcript word, script position) with match, join (two or three spoken words that, put end to end, are exactly one written word: « Factory » « Live » for « factory-live », then one word of the document), insertion, deletion, restart (back into the current or previous sentence) and abandon (to the end of a sentence); the cheapest path splits the take into attempts, the last complete attempt of each sentence is kept, and each word becomes `kept`, `retake`, `filler` (French lexicon `FILLERS`) or `off_script`. The document also times each word of the script (`script_words`) in its written form, whatever whisper heard; a word no spoken word was kept for (« l'EPR » heard for « les PR ») shares the silence where it was said, or else the span of the neighbour heard longer than written. A showcase's captions will be read from them (#28).
 
 ## Why this shape
 
@@ -21,7 +21,7 @@ Restarts and abandons make retakes, stutters and unfinished sentences cheaper to
 
 ## If you change this
 
-- **Hits:** [cut](cut.md), which reads the labels (a word heard in pieces is several kept words with one script index); the `align` parameters in `state.json` (every video's align becomes stale when a cost or the lexicon changes); `tests/test_align.py` and `tests/test_cut.py`.
+- **Hits:** [cut](cut.md), which reads the labels, and [compose](compose.md), whose captions show each kept word once in its written form (the pieces of a word are already one word); the `align` parameters in `state.json` (every video's align becomes stale when a cost or the lexicon changes); `tests/test_align.py` and `tests/test_cut.py`.
 - **Does not hit:** the transcript itself ([transcribe](transcribe.md)).
 
 ## See

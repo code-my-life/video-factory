@@ -177,6 +177,9 @@ def parse(text: str) -> Vitrine:
     theme = fields.get("theme")
     if not isinstance(theme, str) or not theme:
         raise ScriptError("en-tête : une vitrine nomme son thème (« theme: … »)")
+    duration = fields.get("duree_visee")
+    if not isinstance(duration, int) or isinstance(duration, bool):
+        raise ScriptError("en-tête : « duree_visee », la durée visée en secondes, manque ou n'est pas un nombre entier")
     words = script.parse(text).words
     lines: list[Line] = []
     count = 0
@@ -234,7 +237,7 @@ def parse(text: str) -> Vitrine:
         cover = Cover(tuple(part.strip() for part in str(fields["vignette"]).split(SEPARATOR)), at)
     return Vitrine(
         theme=theme,
-        duration=int(fields["duree_visee"]),
+        duration=duration,
         lines=tuple(lines),
         words=words,
         banner=banner(str(fields["bandeau"])) if "bandeau" in fields else None,
@@ -255,11 +258,12 @@ def elevenlabs_text(vitrine: Vitrine, model: str = "v3") -> str:
         raise ValueError(f"modèle « {model} » : v3 ou v2")
     said = []
     for line in vitrine.lines:
-        tags = dict(line.tones) if model == "v3" else {}
+        tags: dict[int, list[str]] = {}
+        for index, tag in line.tones if model == "v3" else ():
+            tags.setdefault(index, []).append(tag)
         parts = []
         for index in range(line.first, line.last):
-            if index in tags:
-                parts.append(f"[{tags[index]}]")
+            parts.extend(f"[{tag}]" for tag in tags.get(index, ()))
             parts.append(vitrine.words[index].text.replace(script.NO_BREAK, " "))
         said.append((line, " ".join(parts)))
     if model == "v2":

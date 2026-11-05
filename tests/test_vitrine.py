@@ -108,12 +108,15 @@ def test_a_broken_showcase_line_is_refused_with_its_line_number(body, message):
         vitrine.parse(HEADER + body + "\n")
 
 
-def test_a_showcase_names_its_theme_and_a_face_camera_script_is_not_a_showcase():
+def test_a_showcase_names_its_theme_and_its_duration_and_a_face_camera_script_is_not_a_showcase():
     without_theme = HEADER.replace("theme: primer\n", "")
     with pytest.raises(scripts.ScriptError, match="une vitrine nomme son thème"):
         vitrine.parse(without_theme + "Coucou. [plan: a]\n")
     fields, _body = frontmatter.split(without_theme)
     assert schemas.problems(fields, SCRIPT_SCHEMA) != []
+    without_duration = HEADER.replace("duree_visee: 20\n", "")
+    with pytest.raises(scripts.ScriptError, match="« duree_visee », la durée visée en secondes, manque"):
+        vitrine.parse(without_duration + "Coucou. [plan: a]\n")
     with pytest.raises(scripts.ScriptError, match="n'est pas une vitrine"):
         vitrine.parse(HEADER.replace("genre: vitrine\n", "") + "Coucou.\n")
 
@@ -210,3 +213,8 @@ def test_a_word_whisper_left_out_takes_the_silence_where_it_was_said():
     assert found["Pour"][:2] == (2.0, 2.4)
     assert found["les"] == (2.4, 2.7, False)
     assert found["PR,"] == (2.7, 3.1, True)
+
+
+def test_two_tones_before_one_word_are_both_said_in_their_order():
+    found = vitrine.parse(HEADER + "[ton: thoughtful] [ton: whispers] Bonjour. [plan: a]\n")
+    assert vitrine.elevenlabs_text(found) == "[thoughtful] [whispers] Bonjour.\n"

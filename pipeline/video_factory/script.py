@@ -12,8 +12,9 @@ place each line on its shots and add no spoken word, so the words and sentences 
 
 Each word keeps its written form, shown in the captions, and a normalized form compared with the transcript. A mark
 of punctuation written apart stays with its word, so the captions keep it: a closing one (« code ! », « d'usine : »)
-with the word before, an opening one (« « bien ») with the word after, separated by a no-break space where French
-typography puts one (before « ! ? : ; » », after « « »).
+or a dash (« Et - voilà ») with the word before, an opening one (« « bien ») with the word after, separated by a
+no-break space where French typography puts one (before « ! ? : ; » » and a dash, after « « »). A mark at the start of
+a sentence (a dialogue dash) is dropped; an opening mark with no word after it on its line is refused.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "`": "'"})
 INNER = re.compile(r"[^\w'\-]+")
 # Marks written apart: the high ones of French typography take a no-break space before them, the opening guillemet one
 # after it; an opening mark goes with the word after it.
-HIGH_MARKS = frozenset("!?:;»")
+HIGH_MARKS = frozenset("!?:;»-\u2013\u2014")  # and the hyphen, en dash and em dash written apart, as dashes
 OPENING = frozenset("«(\u201c\u2018")  # «, (, and the left double and single quotation marks
 NO_BREAK = "\u00a0"
 
@@ -110,8 +111,9 @@ def parse(text: str) -> Script:
         first = len(words)
         position = 0
         pending: list[tuple[str, str, int]] = []  # shots of this line: kind, content, words said before it
+        opening = ""  # opening marks waiting for their word, across the annotations
         for match in ANNOTATION.finditer(line):
-            add_words(line[position : match.start()], len(sentences), words, number)
+            opening = add_words(line[position : match.start()], len(sentences), words, number, opening)
             anchor = len(words) - 1 if len(words) > first else first
             kind, content = match.group("kind"), (match.group("content") or "").strip()
             if vitrine:
@@ -124,7 +126,9 @@ def parse(text: str) -> Script:
             else:
                 raise ScriptError(f"ligne {number} : annotation « {match.group(0)} » inconnue ou vide")
             position = match.end()
-        add_words(line[position:], len(sentences), words, number)
+        opening = add_words(line[position:], len(sentences), words, number, opening)
+        if opening:
+            raise ScriptError(f"ligne {number} : « {opening.strip(NO_BREAK)} » n'ouvre aucun mot")
         if len(words) == first:
             raise ScriptError(f"ligne {number} : une annotation sans texte dit")
         for kind, content, before in pending:
@@ -137,10 +141,10 @@ def parse(text: str) -> Script:
     return Script(tuple(words), tuple(sentences), tuple(shots), tuple(zooms))
 
 
-def add_words(text: str, sentence: int, words: list[Word], number: int) -> None:
+def add_words(text: str, sentence: int, words: list[Word], number: int, opening: str = "") -> str:
+    """Add the words of a stretch of a line; opening marks still waiting for a word are taken in and given back."""
     if "[" in text or "]" in text:
         raise ScriptError(f"ligne {number} : crochet sans annotation dans « {text.strip()} »")
-    opening = ""
     for token in text.split():
         norm = normalize(token)
         if norm:
@@ -151,3 +155,4 @@ def add_words(text: str, sentence: int, words: list[Word], number: int) -> None:
         elif words and words[-1].sentence == sentence:
             space = NO_BREAK if token[0] in HIGH_MARKS else ""
             words[-1] = replace(words[-1], text=f"{words[-1].text}{space}{token}")
+    return opening

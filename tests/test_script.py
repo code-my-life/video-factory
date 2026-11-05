@@ -30,6 +30,13 @@ def test_a_mark_written_apart_stays_with_its_word_for_the_captions():
     assert [w.norm for w in found.words][3:7] == ["code", "une", "ligne", "d'usine"]
 
 
+def test_an_opening_mark_before_an_annotation_still_opens_its_word_and_a_dash_keeps_its_space():
+    found = scripts.parse(HEAD + "Et « [zoom] bien » - voilà.\n")
+    assert [w.text for w in found.words] == ["Et", "«\u00a0bien\u00a0»\u00a0-", "voilà."]
+    with pytest.raises(scripts.ScriptError, match="ligne 7 : « « » n'ouvre aucun mot"):
+        scripts.parse(HEAD + "Il dit « [zoom]\n")
+
+
 def test_a_shot_at_the_end_of_a_line_covers_the_sentence_and_a_shot_inside_starts_on_the_word_before():
     found = scripts.parse(HEAD + "Un deux trois. [etapes: A | B | C]\nQuatre cinq [stat: 9 | postes] six.\n")
     assert [(s.kind, s.anchor, s.parts()) for s in found.shots] == [

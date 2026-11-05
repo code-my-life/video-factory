@@ -77,7 +77,10 @@ def test_missing_script_words_are_listed():
     assert align.align(words, scripts.parse(SCRIPT))["missing"] == [2]
 
 
-def test_a_word_heard_in_pieces_is_kept_whole():
-    found = labelled("le co de est simple et il est rapide pour tous")
-    assert found[1:3] == [("co", "kept", 1), ("de", "kept", 1)]
-    assert [index for _text, label, index in found if label == "kept"] == [0, 1, 1, *range(2, 10)]
+def test_a_word_heard_in_pieces_is_one_kept_word_with_the_time_of_its_pieces():
+    said = ["le", "co", "de", "est", "simple"]
+    words = [{"text": t, "start": 0.5 * k, "end": 0.5 * k + 0.4} for k, t in enumerate(said)]
+    found = align.align(words, scripts.parse(SCRIPT))
+    assert found["words"][1] == {"text": "co de", "start": 0.5, "end": 1.4, "label": "kept", "script": 1}
+    assert [word["script"] for word in found["words"]] == [0, 1, 2, 3]
+    assert found["script_words"][1] == {"text": "code", "start": 0.5, "end": 1.4, "said": True, "sentence": 0}
