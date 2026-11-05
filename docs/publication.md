@@ -2,6 +2,10 @@
 
 Les premières vidéos sont publiées à la main. Postiz automatisera YouTube et Instagram au lot P2 (#6) ; TikTok restera à la main, car une app non auditée n'y publie qu'en privé.
 
+## L'IA s'affiche, elle ne se cache jamais
+
+Dès que l'IA prend part à une vidéo, une voix de synthèse (ElevenLabs) ou une image générée, l'étiquette IA de chaque plateforme est activée. C'est le choix du propriétaire, qui revendique l'usage de l'IA (décision du 5 novembre 2026), et c'est aussi une obligation des plateformes pour un son ou une image réalistes générés. Le casque seul, sans voix ni image générée, reste un effet de réalité augmentée : rien à déclarer, mais rien n'empêche de l'étiqueter.
+
 ## Le crédit du robot, sur chaque vidéo
 
 Le casque vient d'un modèle sous CC BY 4.0. Sa licence demande le crédit, la licence et la mention des modifications. Ce texte va dans la légende ou la description de chaque vidéo, sur chaque plateforme :
@@ -14,7 +18,7 @@ Le casque vient d'un modèle sous CC BY 4.0. Sa licence demande le crédit, la l
 - **Où** : l'app TikTok, ou le planificateur de TikTok Studio sur le web, jusqu'à environ dix jours à l'avance.
 - **La légende** : une phrase qui dit le sujet, le crédit du robot, puis trois à cinq mots-clés.
 - **La couverture** : l'image de couverture produite par la chaîne.
-- **L'étiquette « contenu généré par IA »** : non. Le casque est un effet de réalité augmentée, et la voix est réelle. Elle devient obligatoire dès qu'une vidéo montre une image réaliste générée.
+- **L'étiquette « contenu généré par IA »** : oui dès que la voix ou une image est générée (« Plus d'options » au moment de publier), selon la règle ci-dessus.
 
 ## YouTube Shorts
 
@@ -22,13 +26,14 @@ Le casque vient d'un modèle sous CC BY 4.0. Sa licence demande le crédit, la l
 - **Le titre** : celui du script.
 - **La description** : une phrase, le lien de la vidéo du jour si besoin, le crédit du robot.
 - **L'audience** : « Non, elle n'est pas conçue pour les enfants ».
-- **Le contenu modifié ou synthétique** : non, pour la même raison que sur TikTok.
+- **Le contenu modifié ou synthétique** : oui dès que la voix ou une image est générée, comme sur TikTok.
 
 ## Instagram Reels
 
 - **Le fichier** : le master (1440x2560).
 - **La légende** : une phrase, le crédit du robot, trois à cinq mots-clés.
 - **La couverture** : l'image de couverture, recadrée au centre en 3:4 pour la grille du profil.
+- **L'étiquette IA de Meta (« Info IA »)** : activée dès que la voix ou une image est générée, comme sur TikTok.
 
 ## Une vidéo qui pousse une offre
 
