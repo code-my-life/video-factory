@@ -6,13 +6,14 @@ paths:
   - schemas/script.schema.json
 hits:
   - templates/script.md
+  - templates/script-vitrine.md
   - pipeline/video_factory/videos.py
   - tests/test_schemas.py
 ---
 
 # script schema
 
-`schemas/script.schema.json`: the front matter of `script.md`: `id`, `titre`, `plateforme` (tiktok) and `duree_visee`, a whole number of seconds from 61 to 65 (the owner's decision of 2026-11-04). These two bounds are the only place the duration of a video is written: `qc` reads them for the master.
+`schemas/script.schema.json`: the front matter of `script.md`: `id`, `titre`, `plateforme` (tiktok) and `duree_visee`, a whole number of seconds from 61 to 65 (the owner's decision of 2026-11-04). These two bounds are the only place the duration of a video is written: `qc` reads them for the master. A showcase adds `genre: vitrine` (`face-camera` otherwise) and must name its `theme`; `bandeau`, `vignette` and `vignette_image` (a second of the video, with a decimal comma or point) are optional. Their meaning is read by [vitrine](../pipeline/vitrine.md).
 
 ## Why this shape
 
@@ -20,7 +21,7 @@ TikTok Creator Rewards only pays videos of a minute or more, and every video aim
 
 ## If you change this
 
-- **Hits:** the [script template](../templates/script-template.md), which must still validate; every `script.md` in `video-content`; [videos](../pipeline/videos.md); [qc](../pipeline/qc.md), which reads the duration bounds; `tests/test_schemas.py` and `tests/test_qc.py`.
+- **Hits:** the [script template](../templates/script-template.md) and the [showcase template](../templates/script-vitrine-template.md), which must still validate; every `script.md` in `video-content`; [videos](../pipeline/videos.md); [qc](../pipeline/qc.md), which reads the duration bounds; `tests/test_schemas.py` and `tests/test_qc.py`.
 - **Does not hit:** the body of the script, which this schema does not describe.
 
 ## See

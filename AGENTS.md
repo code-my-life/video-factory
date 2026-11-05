@@ -18,6 +18,7 @@ video-factory est le Monteur vidéo de Code My Life : la commande `vf` fait les 
 | Faire le master, voir l'état | `uv run vf run <id>`, `uv run vf status <id>` |
 | Préparer la publication à la main | `uv run vf publish <id>` |
 | Tourner un plan d'app (vidéos vitrine) | `uv run vf capture <plan.json> [--sortie DIR]` (plans sous `vitrine/<app>/plans/`) |
+| Une vitrine : son script, sa voix | `uv run vf new <id> --vitrine`, `uv run vf voix <id>` (le texte pour ElevenLabs), `uv run vf ingest <id> --voix <fichier>` |
 | Board « studio » | `hermes/install.sh` (et `--uninstall`), `uv run vf studio carte <id>`, `uv run vf studio tick` |
 | Lint | `uv run ruff check` et `uv run ruff format --check` |
 | Tests | `uv run pytest` (les tests qui font tourner FFmpeg ou un modèle prennent les outils figés ; sans eux ils sont sautés, et en CI, où `VF_REQUIRE_TOOLS=1`, ils échouent) |
@@ -27,7 +28,7 @@ La CI (`.github/workflows/ci.yml`) lance « Aucun contenu » et « Lint et tests
 
 ## Où sont les choses
 
-`pipeline/video_factory/` (le paquet de `vf` et ses huit étapes), `toolchain/` (les outils figés et le `Dockerfile.render`), `schemas/` (les contrats publiés : état, script, plan de capture et source d'une app filmée), `templates/` (le gabarit du script, et `templates/hyperframes/` : les gabarits du projet HyperFrames de `compose` et les blocs du registre, restylés à titre provisoire), `.claude/skills/` (le skill `video-factory` et quatre skills internes de HyperFrames, avec leur origine), `scripts/` (le contrôle « Aucun contenu »), `hermes/` (le board Hermès « studio » : manifeste, fiche du workflow pour factory-live, profil `studio-writer`, install), `vitrine/` (les apps filmées par `vf capture` : source figée, variante de scénario, plans), `pipeline/video_factory/capture/` (`vf capture`, son pilote Playwright et sa caméra), `pipeline/video_factory/studio/` (ses voies, sa page, ses messages) et `templates/studio/` (les fichiers de la page), `tests/`.
+`pipeline/video_factory/` (le paquet de `vf` et ses huit étapes), `toolchain/` (les outils figés et le `Dockerfile.render`), `schemas/` (les contrats publiés : état, script, plan de capture et source d'une app filmée), `templates/` (les gabarits du script, face caméra et vitrine, et `templates/hyperframes/` : les gabarits du projet HyperFrames de `compose` et les blocs du registre, restylés à titre provisoire), `.claude/skills/` (le skill `video-factory` et quatre skills internes de HyperFrames, avec leur origine), `scripts/` (le contrôle « Aucun contenu »), `hermes/` (le board Hermès « studio » : manifeste, fiche du workflow pour factory-live, profil `studio-writer`, install), `vitrine/` (les apps filmées par `vf capture` : source figée, variante de scénario, plans), `pipeline/video_factory/capture/` (`vf capture`, son pilote Playwright et sa caméra), `pipeline/video_factory/studio/` (ses voies, sa page, ses messages) et `templates/studio/` (les fichiers de la page), `tests/`.
 
 Carte du dépôt : [docs/map/AGENTS.md](docs/map/AGENTS.md).
 

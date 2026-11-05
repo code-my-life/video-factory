@@ -11,7 +11,7 @@ hits:
 
 # steps
 
-The eight steps as inputs (name to fingerprint), parameters and run, each run working in a store scratch folder and returning its files and a summary; plus the cleaning of captures.
+The eight steps as inputs (name to fingerprint), parameters and run, each run working in a store scratch folder and returning its files and a summary; plus the cleaning of captures. A showcase (`genre: vitrine`) takes its own branch: `ingest` reads its voice, not takes; `transcribe` and `align` are those of every video; `cut` stops the chain with a message until the montage of a showcase is built (#28, PR 2).
 
 ## Why this shape
 

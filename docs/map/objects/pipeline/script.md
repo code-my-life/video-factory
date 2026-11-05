@@ -7,13 +7,14 @@ paths:
 hits:
   - pipeline/video_factory/align.py
   - pipeline/video_factory/compose.py
+  - pipeline/video_factory/vitrine.py
   - templates/script.md
   - tests/test_script.py
 ---
 
 # script
 
-Parses the body of `script.md`: one sentence per line, each word in its written form (shown in captions) and its normalized form (compared with the transcript), the full-frame shots (`stat`, `etapes`, `code`, `capture`) with their anchor word and their `|`-separated parts, and the punch-ins (`zoom`).
+Parses the body of `script.md`: one sentence per line, each word in its written form (shown in captions) and its normalized form (compared with the transcript), the full-frame shots (`stat`, `etapes`, `code`, `capture`) with their anchor word and their `|`-separated parts, and the punch-ins (`zoom`). A mark of punctuation written apart stays with its word (« code ! », « « bien » »), with the no-break space of French typography, so the captions keep it. In a showcase (`genre: vitrine`) the annotations of [vitrine](vitrine.md) are skipped (they add no word) and any other is refused.
 
 ## Why this shape
 
@@ -21,7 +22,7 @@ A shot noted at the end of a line covers its whole sentence, because that is how
 
 ## If you change this
 
-- **Hits:** [align](align.md) and [compose](compose.md), which read words, shots and zooms; every `script.md` in `video-content`; the annotations documented in `templates/script.md` and the RUNBOOK; `tests/test_script.py`.
+- **Hits:** [align](align.md) and [compose](compose.md), which read words, shots and zooms; [vitrine](vitrine.md), which counts the words of each line as this module does; every `script.md` in `video-content`; the annotations documented in `templates/script.md` and the RUNBOOK; `tests/test_script.py`.
 - **Does not hit:** the front matter, read by [frontmatter](frontmatter.md) and checked by the [script schema](../contracts/script-schema.md).
 
 ## See
