@@ -167,8 +167,16 @@ def test_the_vf_command_names_what_is_missing(tmp_path, monkeypatch, capsys):
     assert "vidéo « absente » introuvable" in capsys.readouterr().err
     assert cli.main(["new", "essai"]) == 0
     assert cli.main(["ingest", "essai"]) == 1
-    assert "aucune prise ni capture" in capsys.readouterr().err
+    assert "aucune prise, voix ni capture" in capsys.readouterr().err
     assert cli.main(["run", "essai"]) == 1
     assert "aucune prise : vf ingest essai <fichiers>" in capsys.readouterr().err
     assert cli.main(["status", "essai"]) == 0
     assert "jamais passée  ingest" in capsys.readouterr().out
+
+
+def test_a_step_read_back_from_state_json_is_not_stale_for_its_tuples_turned_into_lists(video):
+    # The sizes of master are tuples in the code and lists in state.json: once read back, the step stays up to date.
+    reloaded = Video.open(video.places, video.id, video.toolbox)
+    reloaded.state["steps"]["master"]["params"] = json.loads(json.dumps(chain.steps.master_params(reloaded)))
+    assert isinstance(chain.steps.master_params(reloaded)["sizes"]["master"], tuple)
+    assert {found.step: found.label for found in chain.status(reloaded)}["master"] == chain.UP_TO_DATE

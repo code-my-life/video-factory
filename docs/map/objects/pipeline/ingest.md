@@ -12,7 +12,7 @@ hits:
 
 # ingest
 
-`ingest`: the working copy of a video from its takes, each delivered clean and framed: a take that is not 9:16 is refused with its size, its frame is kept as is (no crop, no flip, no blur), 30 fps constant, BT.709 SDR (gamut conversion, fixed Hable tone map for HLG and PQ), 48 kHz mono 24-bit, takes joined end to end, no metadata at all.
+`ingest`: the working copy of a video from its takes, each delivered clean and framed: a take that is not 9:16 is refused with its size, its frame is kept as is (no crop, no flip, no blur), 30 fps constant, BT.709 SDR (gamut conversion, fixed Hable tone map for HLG and PQ), 48 kHz mono 24-bit, takes joined end to end, no metadata at all. For a showcase, the working copy is its voice alone (`make_voice_copy`): any audio file (MP3, WAV) becomes 48 kHz mono 24-bit WAV, without tags; a file without sound is refused as a voice.
 
 ## Why this shape
 
@@ -25,4 +25,4 @@ Colour is read from each take (a screen recording and a camera take differ), geo
 
 ## See
 
-- [`make_working_copy`](../../../../pipeline/video_factory/ingest.py), [`colour_filter`](../../../../pipeline/video_factory/ingest.py), [`take_filters`](../../../../pipeline/video_factory/ingest.py), [`command`](../../../../pipeline/video_factory/ingest.py)
+- [`make_working_copy`](../../../../pipeline/video_factory/ingest.py), [`colour_filter`](../../../../pipeline/video_factory/ingest.py), [`take_filters`](../../../../pipeline/video_factory/ingest.py), [`command`](../../../../pipeline/video_factory/ingest.py), [`make_voice_copy`](../../../../pipeline/video_factory/ingest.py)

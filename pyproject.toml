@@ -1,6 +1,6 @@
 [project]
 name = "video-factory"
-version = "0.6.0"
+version = "0.7.0"
 description = "Monteur vidéo de Code My Life : la commande vf, de la prise au master."
 readme = "README.md"
 license = "MIT"

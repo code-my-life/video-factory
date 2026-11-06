@@ -16,7 +16,7 @@ hits:
 
 # page
 
-The studio page on 127.0.0.1:8448, published on the tailnet by `tailscale serve`: the cards, the draft to approve, the takes to send, the master to review (with byte ranges, for Safari), the files and caption to post, and the owner's gestures as unblocks. A take is streamed into the store's scratch folder while hashed, and refused unless it matches the SHA-256 the phone computed by slices (`sha256.js`).
+The studio page on 127.0.0.1:8448, published on the tailnet by `tailscale serve`: the cards, the draft to approve, the takes to send, the master to review (with byte ranges, for Safari), the files and caption to post, and the owner's gestures as unblocks. A take is streamed into the store's scratch folder under its rank and the name it was sent with (a showcase stores each rush as the capture of that name; its form also takes the audio of the voice) while hashed, and refused unless it matches the SHA-256 the phone computed by slices (`sha256.js`).
 
 It also serves the generic workflow API (`api.py`, ADR 0006) that factory-live reads: the sheet (`hermes/workflow.json`, in factory-live's `WorkflowSheet` format), the items and their state, an item's steps and typed files, the master's words in output time, and the owner's gesture.
 

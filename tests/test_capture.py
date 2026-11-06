@@ -295,8 +295,10 @@ def test_the_scene_is_written_whole_and_loads_only_its_own_files(tmp_path):
 
 def test_the_capture_scene_is_left_out_of_compose_and_its_fingerprint():
     assert chain.TEMPLATE
-    assert not any("camera-follow" in name or "MonaSans" in name for name in chain.TEMPLATE)
+    assert not any("camera-follow" in name for name in chain.TEMPLATE)
     assert not any("/phone/" in name for name in chain.TEMPLATE)
+    # The showcase theme has its own copy of the font, which compose reads: it counts.
+    assert "templates/hyperframes/themes/primer/fonts/MonaSans-wght-latin.woff2" in chain.TEMPLATE
 
 
 def test_two_captures_are_identical_when_their_fingerprints_match(tmp_path):

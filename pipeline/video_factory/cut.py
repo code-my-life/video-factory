@@ -3,7 +3,9 @@
 The video keeps the words that are said once and for all: the kept words and the words outside the script, from the
 first kept word to the last. Between two of them, a pause longer than MAX_SILENCE, or one that held a filler or a
 retake, is brought down to KEPT_SILENCE (half of it after the first word, half before the next). A cut never falls
-inside a kept word: the step refuses the list rather than cut one.
+inside a kept word: the step refuses the list rather than cut one. The pieces of a word whisper heard apart (« Factory »
+« Live » kept for « factory-live », marked « joined » by align) are cut like two words, a long pause between them
+shortened too, then listed as one said word, so the captions show it once.
 
 Times are seconds on the sample grid of the voice (48 kHz); a segment may start between two frames, and the video
 shows, at each output frame, the source frame on screen at that instant (`source_frames`).
@@ -140,7 +142,19 @@ def decide(words: Sequence[dict], duration: float) -> dict:
         "duration": round(total, 9),
         "frames": math.ceil(total * FPS - EPSILON),
         "segments": segments,
-        "words": [
+        "words": said_words(said, segments),
+    }
+
+
+def said_words(said: Sequence[dict], segments: list[dict]) -> list[dict]:
+    """Each said word in source and output time; a piece joined to the word before it (align) extends that word."""
+    found: list[dict] = []
+    for word in said:
+        end = round(output_time(segments, word["end"]), 6)
+        if word.get("joined") and found:
+            found[-1] |= {"text": f"{found[-1]['text']} {word['text']}", "src_end": word["end"], "end": end}
+            continue
+        found.append(
             {
                 "text": word["text"],
                 "label": word["label"],
@@ -148,11 +162,10 @@ def decide(words: Sequence[dict], duration: float) -> dict:
                 "src_start": word["start"],
                 "src_end": word["end"],
                 "start": round(output_time(segments, word["start"]), 6),
-                "end": round(output_time(segments, word["end"]), 6),
+                "end": end,
             }
-            for word in said
-        ],
-    }
+        )
+    return found
 
 
 def source_frames(edl: dict) -> list[int]:

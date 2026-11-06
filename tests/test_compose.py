@@ -113,6 +113,17 @@ def hosts_of(page: str) -> dict[str, dict[str, str]]:
 
 
 @pytest.mark.acceptance("le projet produit monte une scène par plan du script")
+def test_a_word_heard_in_pieces_shows_once_in_the_captions():
+    script = scripts.parse(SCRIPT)
+    said = [word.norm for word in script.words]
+    said[1:2] = ["co", "de"]  # « code » heard in two pieces
+    words = [{"text": t, "start": 0.5 * k + 0.1, "end": 0.5 * k + 0.45} for k, t in enumerate(said)]
+    edl = cut.decide(align.align(words, script)["words"], 30.0)
+    plan = compose.plan(edl, script, CAPTURES)
+    assert [word["text"] for word in plan["words"]][:4] == ["Le", "code", "est", "simple."]
+    assert len(plan["words"]) == len(script.words)
+
+
 def test_the_project_mounts_one_scene_per_shot_of_the_script(tmp_path):
     plan, project = written(tmp_path)
     page = (project / "index.html").read_text(encoding="utf-8")

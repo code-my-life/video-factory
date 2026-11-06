@@ -12,7 +12,7 @@ hits:
 
 # cut
 
-`cut`: the edit decision list on the 48 kHz sample grid: kept and off-script words from the first kept word to the last, pauses over 400 ms brought to 150 ms, fillers and retakes removed whole; each said word with its output time; `source_frames` maps each output frame to the source frame on screen.
+`cut`: the edit decision list on the 48 kHz sample grid: kept and off-script words from the first kept word to the last, pauses over 400 ms brought to 150 ms, fillers and retakes removed whole; each said word with its output time, the pieces of a word whisper heard apart cut like two words (a long pause between them shortened too) and then listed as one, so the captions show it once; `source_frames` maps each output frame to the source frame on screen.
 
 ## Why this shape
 

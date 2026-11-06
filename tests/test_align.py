@@ -75,3 +75,14 @@ def test_missing_script_words_are_listed():
     said = "le code simple et il est rapide pour tous"
     words = [{"text": t, "start": 0.0, "end": 0.1} for t in said.split(" ")]
     assert align.align(words, scripts.parse(SCRIPT))["missing"] == [2]
+
+
+def test_each_piece_of_a_word_heard_apart_is_kept_for_it_and_the_word_has_the_time_of_its_pieces():
+    said = ["le", "co", "de", "est", "simple"]
+    words = [{"text": t, "start": 0.5 * k, "end": 0.5 * k + 0.4} for k, t in enumerate(said)]
+    found = align.align(words, scripts.parse(SCRIPT))
+    assert [(word["text"], word["label"], word["script"], word.get("joined")) for word in found["words"]][1:3] == [
+        ("co", "kept", 1, None),
+        ("de", "kept", 1, True),
+    ]
+    assert found["script_words"][1] == {"text": "code", "start": 0.5, "end": 1.4, "said": True, "sentence": 0}

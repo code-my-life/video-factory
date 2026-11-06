@@ -60,6 +60,13 @@ def extension_of(name: str) -> str:
     return found if EXTENSION.match(found) else "mov"
 
 
+def stem_of(name: str) -> str:
+    """The name of a received file without its extension, in lower case letters, digits and hyphens: a showcase stores
+    a rush under it, as the capture its script names."""
+    found = re.sub(r"[^a-z0-9]+", "-", Path(urllib.parse.unquote(name)).stem.lower()).strip("-")
+    return found[:60].strip("-") or "fichier"  # the alphabet and length of a capture's name (vitrine.CAPTURE_NAME)
+
+
 def layout(title: str, body: str) -> bytes:
     return (
         "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
@@ -148,9 +155,18 @@ class Pages:
                 + "</section>"
             )
         if station == "tournage":
+            showcase = self.studio.is_showcase(video_id)
+            title = "La voix et les rushs" if showcase else "Les prises"
+            accept = "audio/*,video/*" if showcase else "video/*"
+            hint = (
+                "<p class='doux'>Le fichier audio est la voix ; chaque rush garde le nom que le script lui donne "
+                "(« plan1.mp4 » pour [plan: plan1]).</p>"
+                if showcase
+                else ""
+            )
             return (
-                f"<section><h2>Les prises</h2><form id='prises' data-video='{video_id}'>"
-                "<input type='file' accept='video/*' multiple required><br>"
+                f"<section><h2>{title}</h2>{hint}<form id='prises' data-video='{video_id}'>"
+                f"<input type='file' accept='{accept}' multiple required><br>"
                 "<button>Envoyer</button></form><ol id='suivi'></ol></section>"
                 "<script src='/static/sha256.js'></script><script src='/static/upload.js'></script>"
             )
@@ -327,8 +343,9 @@ def handler_for(studio: Studio) -> type[BaseHTTPRequestHandler]:
             if found is None or not DIGEST.match(phone):
                 self.reply_json(400, {"message": "envoi refusé : adresse ou empreinte du téléphone invalide"})
                 return
-            target = staging(studio, found[1]) / f"{int(found[2]):03d}.{extension_of(self.headers.get('X-Nom') or '')}"
-            for old in target.parent.glob(f"{int(found[2]):03d}.*"):
+            name = self.headers.get("X-Nom") or ""
+            target = staging(studio, found[1]) / f"{int(found[2]):03d}-{stem_of(name)}.{extension_of(name)}"
+            for old in target.parent.glob(f"{int(found[2]):03d}-*.*"):
                 old.unlink()
             try:
                 received = receive(self.rfile, int(self.headers.get("Content-Length") or 0), target)
@@ -377,13 +394,20 @@ def handler_for(studio: Studio) -> type[BaseHTTPRequestHandler]:
             if count < 1 or len(files) != count:
                 self.reply_json(400, {"message": f"{len(files)} prise(s) reçue(s) pour {count} annoncée(s)"})
                 return
-            done = studio.takes_received(video_id, files)
+            try:
+                done = studio.takes_received(video_id, files)
+            except BoardError as exc:
+                self.reply_json(422, {"message": str(exc)})
+                return
             if done.returncode != 0:
                 self.reply_json(422, {"message": f"vf ingest refuse les prises : {tail(done)}"})
                 return
             shutil.rmtree(folder, ignore_errors=True)
-            moved = f"{count} prise(s) versée(s) : la carte passe en {BY_KEY['montage'].label}."
-            self.reply_json(200, {"message": moved})
+            if studio.facts(video_id).takes:
+                message = f"{count} fichier(s) versé(s) : la carte passe en {BY_KEY['montage'].label}."
+            else:
+                message = f"{count} fichier(s) versé(s) ; il en manque encore au script : la carte reste au tournage."
+            self.reply_json(200, {"message": message})
 
     return Handler
 

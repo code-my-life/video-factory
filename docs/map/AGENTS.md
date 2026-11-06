@@ -33,10 +33,13 @@ Covered roots: `pipeline/`, `hermes/`, `vitrine/`, `templates/`, `.claude/skills
 - "doctor": `vf doctor` (this repository); `hyperframes doctor` is HyperFrames' own command and is never called.
 - "videos": `videos/<id>/` folders live in `video-content`; `pipeline/video_factory/videos.py` is the module that creates them. The no-content check refuses a `videos/` folder, never a file named `videos.py`.
 - "pipeline": the package directory `pipeline/` (Python source root), and the chain of steps it will run.
+- "vitrine": the folder `vitrine/` of the apps `vf capture` films, or a showcase video (`genre: vitrine` in its script, read by `pipeline/video_factory/vitrine.py`): the voice over, line by line, on shots of an app and on rushs.
+- "thème" (theme): a folder of `templates/hyperframes/themes/`, the look a showcase's script chooses; not a colour theme of the studio page.
+- "voix": the voice of a showcase, a file stored by `vf ingest --voix` (`voix` in `state.json`) whose text `vf voix` writes for ElevenLabs; not the `voice` step, which cleans the voice of a face camera take.
 
 ## Universes
 
-- **live**: `vf doctor`, `vf doctor --install`, `vf new`, `vf ingest`, `vf status`, `vf run` and the eight steps, `vf publish`, `vf studio` and the board « studio », `vf capture`, its plans and the scenario variant of factory-live, the lock and its schema, the render image, the two published schemas, the script template, the HyperFrames project templates and registry items, the agent skills, the no-content check, the CI and Conventions workflows.
+- **live**: `vf doctor`, `vf doctor --install`, `vf new` (and `--vitrine`), `vf ingest` (and `--voix`), `vf voix`, `vf status`, `vf run` and the eight steps (with the montage of a showcase), the showcase script and its template, the showcase themes, `vf publish`, `vf studio` and the board « studio », `vf capture`, its plans and the scenario variant of factory-live, the lock and its schema, the render image, the two published schemas, the script template, the HyperFrames project templates and registry items, the agent skills, the no-content check, the CI and Conventions workflows.
 - **leftover**: none.
 - **ghost** (named, not built; do not implement against these):
   - `design/`: the video design system, its tokens and fonts (design system issue, after the key frames are validated); it replaces the provisional look of the project templates;

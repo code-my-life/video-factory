@@ -18,6 +18,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from video_factory import script, vitrine
 from video_factory.paths import REPO_ROOT
 
 MANIFEST = REPO_ROOT / "hermes" / "manifest.json"
@@ -109,16 +110,31 @@ class Plan:
 WAIT = Plan("wait")
 
 
-def facts_of(state: dict | None, script_is_template: bool) -> Facts:
-    """The board's view of a state.json (None when the video does not exist yet)."""
+def showcase_shot(state: dict, script_text: str) -> bool:
+    """A showcase is shot when its voice is stored and every capture its script shows is too."""
+    try:
+        names = vitrine.captures(vitrine.parse(script_text))
+    except ValueError:
+        return False
+    return "voix" in state and all(name in state.get("captures", {}) for name in names)
+
+
+def facts_of(state: dict | None, script_is_template: bool, script_text: str = "") -> Facts:
+    """The board's view of a state.json (None when the video does not exist yet) and of its script: the takes of a
+    face camera video, or the voice and the captures of a showcase, stored and ingested."""
     if state is None:
         return Facts()
     steps = state.get("steps", {})
     qc = steps.get("qc", {}).get("summary", {})
+    try:
+        showcase = bool(script_text) and script.genre_of(script_text) == script.VITRINE
+    except ValueError:
+        showcase = False
+    shot = showcase_shot(state, script_text) if showcase else bool(state.get("takes"))
     return Facts(
         exists=True,
         script_is_template=script_is_template,
-        takes=bool(state.get("takes")) and "ingest" in steps,
+        takes=shot and "ingest" in steps,
         qc_passed=bool(qc.get("passed")),
     )
 

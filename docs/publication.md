@@ -4,7 +4,7 @@ Les premières vidéos sont publiées à la main. Postiz automatisera YouTube et
 
 ## L'IA s'affiche, elle ne se cache jamais
 
-Dès que l'IA prend part à une vidéo, une voix de synthèse (ElevenLabs) ou une image générée, l'étiquette IA de chaque plateforme est activée. C'est le choix du propriétaire, qui revendique l'usage de l'IA (décision du 5 novembre 2026), et c'est aussi une obligation des plateformes pour un son ou une image réalistes générés. Le casque seul, sans voix ni image générée, reste un effet de réalité augmentée : rien à déclarer, mais rien n'empêche de l'étiqueter.
+Dès que l'IA prend part à une vidéo, une voix de synthèse (ElevenLabs) ou une image générée, l'étiquette IA de chaque plateforme est activée. Quand le script nomme l'outil de la voix (`voix_ia: ElevenLabs`), `vf publish` l'écrit dans la légende (« Voix générée par IA (ElevenLabs). ») et rappelle d'activer l'étiquette. C'est le choix du propriétaire, qui revendique l'usage de l'IA (décision du 5 novembre 2026), et c'est aussi une obligation des plateformes pour un son ou une image réalistes générés. Le casque seul, sans voix ni image générée, reste un effet de réalité augmentée : rien à déclarer, mais rien n'empêche de l'étiqueter.
 
 ## Le crédit du robot, sur chaque vidéo
 

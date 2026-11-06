@@ -11,7 +11,7 @@ hits:
 
 # stations
 
-The stations of a video on the studio board, read from `hermes/manifest.json`, and `decide`: from a card (its lane, status, events and comments) and the facts of its `state.json`, the next move of the card. Pure functions only.
+The stations of a video on the studio board, read from `hermes/manifest.json`, and `decide`: from a card (its lane, status, events and comments) and the facts of its `state.json`, the next move of the card. A face camera video is shot once its takes are ingested; a showcase once its voice is ingested and every capture its script shows is stored. Pure functions only.
 
 ## Why this shape
 

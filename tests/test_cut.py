@@ -92,3 +92,17 @@ def test_what_comes_before_the_first_kept_word_and_after_the_last_is_trimmed():
 def test_nothing_kept_is_refused():
     with pytest.raises(cut.CutError, match="aucun mot gardé"):
         cut.decide([word("bon", 0.2, 0.5, align.OFF_SCRIPT, None)], 5.0)
+
+
+def test_a_long_pause_inside_a_word_heard_in_pieces_is_shortened_and_the_pieces_are_one_said_word():
+    words = [
+        word("le", 0.2, 0.4, index=0),
+        word("co", 0.5, 0.7, index=1),
+        word("de", 1.5, 1.7, index=1) | {"joined": True},
+    ]
+    edl = cut.decide([*words, word("est", 1.8, 2.0, index=2), word("simple", 2.1, 2.5, index=3)], 5.0)
+    code = output_word(edl, "co de")
+    assert code["script"] == 1 and (code["src_start"], code["src_end"]) == (0.5, 1.7)
+    # The 0.8 s pause between the pieces is brought down to 0.15 s, like any pause between two words.
+    assert code["end"] - code["start"] == pytest.approx(0.2 + 0.15 + 0.2, abs=1e-4)
+    assert [w["text"] for w in edl["words"]] == ["le", "co de", "est", "simple"]

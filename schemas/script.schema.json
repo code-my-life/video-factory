@@ -6,6 +6,12 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "titre", "plateforme", "duree_visee"],
+  "allOf": [
+    {
+      "if": { "properties": { "genre": { "const": "vitrine" } }, "required": ["genre"] },
+      "then": { "required": ["theme"] }
+    }
+  ],
   "properties": {
     "id": {
       "description": "Identifiant de la vidéo, égal au nom de son dossier (même règle que dans state.schema.json).",
@@ -21,6 +27,55 @@
     "plateforme": {
       "description": "Plateforme visée en premier : TikTok, pour Creator Rewards.",
       "const": "tiktok"
+    },
+    "genre": {
+      "description": "Le genre de la vidéo : face caméra (par défaut), ou vitrine, la voix sur des plans d'une app et des rushs du propriétaire (pipeline/video_factory/vitrine.py).",
+      "enum": ["face-camera", "vitrine"]
+    },
+    "theme": {
+      "description": "Le thème d'une vitrine : l'allure des titres, sous-titres, bandeau et écran de fin, un dossier de templates/hyperframes/themes/. Un choix de la vidéo, révisable.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "bandeau": {
+      "description": "Le bandeau du milieu d'une vitrine : « titre | texte | début | durée », les temps en secondes de la vidéo.",
+      "type": "string",
+      "minLength": 1
+    },
+    "vignette": {
+      "description": "Le texte de la vignette : ses lignes séparées par « | », un mot entre astérisques en couleur d'accent.",
+      "type": "string",
+      "minLength": 1
+    },
+    "vignette_image": {
+      "description": "La seconde de la vidéo dont l'image porte la vignette, avec une virgule ou un point décimal.",
+      "type": "string",
+      "pattern": "^[0-9]+(?:[.,][0-9]+)?$"
+    },
+    "icone": {
+      "description": "Une vitrine : la capture de l'icône de l'app (vf ingest --capture), sur le bandeau et l'écran de fin.",
+      "type": "string",
+      "minLength": 1
+    },
+    "ecran_fin": {
+      "description": "Une vitrine : le nom de l'écran de fin, puis son badge et l'icône du badge, « nom | badge | icône ».",
+      "type": "string",
+      "minLength": 1
+    },
+    "legende": {
+      "description": "La phrase du sujet en tête de la légende publiée ; le titre sinon.",
+      "type": "string",
+      "minLength": 1
+    },
+    "mots_cles": {
+      "description": "Les mots-clés en fin de légende, tels qu'ils sont publiés.",
+      "type": "string",
+      "minLength": 1
+    },
+    "voix_ia": {
+      "description": "L'outil qui a généré la voix, quand elle l'est : la légende le dit et vf publish rappelle l'étiquette IA.",
+      "type": "string",
+      "minLength": 1
     },
     "duree_visee": {
       "description": "Durée visée en secondes, de 61 à 65 : à peine plus d'une minute, le seuil de TikTok Creator Rewards (décision du propriétaire du 4 novembre 2026). Ces deux bornes sont aussi celles que qc tient sur le master : vf les lit ici.",
