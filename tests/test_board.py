@@ -408,3 +408,102 @@ def test_a_showcase_goes_from_shooting_to_montage_once_its_voice_and_its_rushes_
     assert studio.vf.calls[-1][2:] == ["--capture", "plan1", str(files["000-plan1.mp4"]), "--capture", "rush-pr",
                                        str(files["001-rush-pr.mp4"])]  # fmt: skip
     assert station(board, card) == "montage/ready"
+
+
+# --- a slow draft (#31): the writer gets the timeout of the manifest, and a timeout parks the card with its reason ----
+
+
+def raising(error: Exception):
+    def run(argv: Sequence[str]) -> subprocess.CompletedProcess:
+        raise error
+
+    return run
+
+
+def reason_of(board, card_id: str) -> str:
+    return [event.payload["reason"] for event in board.tasks[card_id]["events"] if event.kind == "scheduled"][-1]
+
+
+def test_a_writer_past_its_timeout_leaves_the_card_failed_at_script_with_the_reason(studio):
+    from video_factory.studio.board import CommandTimeoutError
+
+    studio.ask_writer = raising(CommandTimeoutError("hermes", 1500))
+    card = studio.open_card("essai", "x")
+    studio.tick()
+    before = len(studio.sent)
+    studio.tick()
+    assert station(studio.board, card) == "script/scheduled"
+    reason = reason_of(studio.board, card)
+    assert reason.startswith("Script en échec : studio-writer n'a pas répondu en")
+    assert "1500 s" in reason
+    assert len(studio.sent) == before + 1
+    assert "studio-writer n'a pas répondu en 1500 s" in studio.sent[-1]
+    for text in (reason, studio.sent[-1]):
+        assert "Écris le brouillon" not in text
+
+
+def test_the_writer_gets_the_timeout_declared_by_the_manifest(monkeypatch, tmp_path):
+    from video_factory.studio import board as board_module
+    from video_factory.studio.service import build
+
+    seen: list[tuple[str, float]] = []
+
+    def run(argv, **kwargs):
+        seen.append((" ".join(argv[:3]), kwargs["timeout"]))
+        return done("{}")
+
+    monkeypatch.setattr(board_module.subprocess, "run", run)
+    made = build({}, tmp_path, background=False, log=lambda _line: None)
+    made.ask_writer(["hermes", "-p", "studio-writer", "chat", "--oneshot", "-Q", "-q", "un prompt"])
+    made.board.run(["hermes", "kanban", "--board", "studio", "list"])
+    made.send("un message")
+    assert load_manifest()["writer_timeout_seconds"] == 1500
+    assert seen == [("hermes -p studio-writer", 1500), ("hermes kanban --board", 180), ("hermes send -t", 180)]
+
+
+def test_a_writer_that_cannot_be_run_leaves_the_card_failed_at_script(studio, tmp_path):
+    from video_factory.studio.board import run_command
+
+    missing = str(tmp_path / "no-hermes-here")
+    studio.ask_writer = lambda argv: run_command([missing, *argv[1:]])
+    card = studio.open_card("essai", "x")
+    studio.tick()
+    studio.tick()
+    assert station(studio.board, card) == "script/scheduled"
+    reason = reason_of(studio.board, card)
+    assert reason.startswith("Script en échec :")
+    assert "Écris le brouillon" not in reason
+    assert "Script en échec" in studio.sent[-1]
+
+
+def test_a_board_error_in_the_script_lane_is_only_logged(studio, monkeypatch):
+    from video_factory.studio.board import BoardError
+
+    lines: list[str] = []
+    studio.log = lines.append
+    card = studio.open_card("essai", "x")
+    studio.tick()
+    sent = len(studio.sent)
+
+    def refused(card_id: str, ttl: int) -> None:
+        raise BoardError("hermes kanban claim refusé (1) : déjà réservée")
+
+    monkeypatch.setattr(studio.board, "claim", refused)
+    studio.tick()
+    assert station(studio.board, card) == "script/ready"
+    assert len(studio.sent) == sent
+    assert any("claim refusé" in line for line in lines)
+
+
+def test_run_command_names_its_timeout_when_a_command_is_too_slow():
+    import time
+
+    from video_factory.studio.board import CommandTimeoutError, run_command
+
+    start = time.monotonic()
+    with pytest.raises(CommandTimeoutError) as caught:
+        run_command(["sleep", "5"], timeout=1)
+    assert time.monotonic() - start <= 2
+    assert caught.value.seconds == 1
+    assert "n'a pas répondu en 1 s" in str(caught.value)
+    assert "sleep 5" not in str(caught.value)

@@ -21,7 +21,7 @@ from pathlib import Path
 from video_factory import script, videos
 from video_factory.paths import REPO_ROOT, SCRIPT_TEMPLATE, SCRIPT_VITRINE_TEMPLATE, Places
 from video_factory.studio import notify, writer
-from video_factory.studio.board import Board, BoardError
+from video_factory.studio.board import Board, BoardError, CommandTimeoutError
 from video_factory.studio.stations import (
     BY_KEY,
     READY_TO_POST,
@@ -52,6 +52,15 @@ def tail(done: subprocess.CompletedProcess, size: int = 400) -> str:
     own = [index for index, line in enumerate(lines) if line.startswith("vf ")]
     kept = lines[own[-1] :] if own else lines
     return " ".join(" ".join(kept).split())[-size:]
+
+
+def writer_failure(exc: Exception) -> str:
+    """Why the draft failed, without the command line: it carries the whole prompt."""
+    if isinstance(exc, CommandTimeoutError):
+        return f"{writer.PROFILE} n'a pas répondu en {exc.seconds:g} s"
+    if isinstance(exc, BoardError):
+        return f"{writer.PROFILE} n'a pas pu être lancé : {exc}"
+    return str(exc)
 
 
 class Jobs:
@@ -251,9 +260,10 @@ class Studio:
                 raise writer.WriterError("aucun profil studio-writer configuré")
             text = writer.draft(self.brief(card, plan.note), self.ask_writer)
             writer.write(self.folder(card.video or "") / videos.SCRIPT_NAME, text)
-        except (writer.WriterError, OSError) as exc:
+        except (writer.WriterError, OSError, BoardError) as exc:
+            # Only the writer runs in this block: a board error here is the writer past its timeout or not run (#31).
             with self.lock:
-                self.park(card.id, card.video or "", "script", str(exc), failed=True)
+                self.park(card.id, card.video or "", "script", writer_failure(exc), failed=True)
             return
         with self.lock:
             self.board.schedule(card.id, "Brouillon écrit par studio-writer")

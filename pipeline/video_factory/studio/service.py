@@ -37,7 +37,7 @@ def build(env: Mapping[str, str], home: Path, *, background: bool = True, log: C
         places=paths.places(env, home),
         url=url,
         send=lambda text: notify.send(text, run_command, target, hermes),
-        ask_writer=run_command,
+        ask_writer=partial(run_command, timeout=float(manifest["writer_timeout_seconds"])),
         brand=expand(manifest["brand"], home),
         claim_ttl=int(manifest["claim_ttl_seconds"]),
         jobs=Jobs(background=background),

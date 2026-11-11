@@ -24,11 +24,25 @@ class BoardError(Exception):
     """The Hermès CLI refused a call or could not be run."""
 
 
-def run_command(argv: Sequence[str]) -> subprocess.CompletedProcess:
+class CommandTimeoutError(BoardError):
+    """A command still running at its timeout; the message names the program and the delay, never the arguments."""
+
+    def __init__(self, program: str, seconds: float) -> None:
+        super().__init__(f"{program} n'a pas répondu en {seconds:g} s")
+        self.seconds = seconds
+
+
+# Every call to Hermès gets this delay, except the writer's draft, which gets the one of the manifest (#31).
+TIMEOUT_SECONDS = 180
+
+
+def run_command(argv: Sequence[str], timeout: float = TIMEOUT_SECONDS) -> subprocess.CompletedProcess:
     env = {key: value for key, value in os.environ.items() if key not in FOREIGN}
     try:
-        return subprocess.run(list(argv), capture_output=True, text=True, timeout=180, env=env, check=False)
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.run(list(argv), capture_output=True, text=True, timeout=timeout, env=env, check=False)
+    except subprocess.TimeoutExpired as exc:
+        raise CommandTimeoutError(argv[0], timeout) from exc
+    except OSError as exc:
         raise BoardError(f"{argv[0]} : {exc}") from exc
 
 
